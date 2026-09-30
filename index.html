@@ -1,0 +1,3476 @@
+<meta charset="utf-8">
+<title>ENDO! · Front Brake Freestyle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<style>
+  html, body { margin: 0; padding: 0; background: #0b0714; overflow: hidden; height: 100%; }
+  #wrap { position: fixed; inset: 0; background: #0b0714; }
+  canvas {
+    position: absolute;
+    background: #000;
+  }
+  #hud {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: "Arial Black", "Arial Bold", Impact, sans-serif;
+    color: #fff;
+  }
+  .thps {
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    text-shadow:
+      -2px -2px 0 #14041c, 2px -2px 0 #14041c,
+      -2px  2px 0 #14041c, 2px  2px 0 #14041c,
+       0 3px 0 #14041c;
+  }
+  #scorebox { position: absolute; top: 3%; left: 3.5%; transform: skewX(-6deg); }
+  #score { font-size: 2.1em; color: #ffd91c; line-height: 1; transform-origin: left center; }
+  #score.bank { animation: bankpop 0.55s ease-out; }
+  @keyframes bankpop {
+    0%   { transform: scale(1); color: #ffd91c; }
+    18%  { transform: scale(1.28); color: #fffbe6; }
+    100% { transform: scale(1); color: #ffd91c; }
+  }
+  #hi    { font-size: 0.72em; color: #ffb3d1; margin-top: 0.2em; }
+  #speed { position: absolute; top: 3%; right: 3.5%; font-size: 1.05em; color: #9ff2ff; transform: skewX(-6deg); text-align: right; }
+  #stance { position: absolute; top: 7.6%; right: 3.5%; font-size: 0.8em; color: #ffd257; transform: skewX(-6deg);
+            text-align: right; opacity: 0; transition: opacity .12s; }
+  #stance.on { opacity: 1; }
+  #combo { position: absolute; left: 3.5%; bottom: 11%; max-width: 44%; transform: skewX(-6deg); }
+  #combo-tricks { font-size: 0.7em; color: #ffffff; line-height: 1.22; }
+  #combo-tricks .sp { color: #ffd91c; }
+  #combo-tricks .more { opacity: 0.55; }
+  #combo-pts { font-size: 1.2em; color: #ffd91c; }
+  /* popups sit up under the score, never across the middle of the screen —
+     the run needs a clear view of the ground in front of the bike */
+  #popup {
+    position: absolute; left: 20%; right: 6%; top: 12%;
+    text-align: center; font-size: 1.05em; color: #ffd91c;
+    opacity: 0; transform: scale(0.5) rotate(-4deg);
+  }
+  #popup.bad { color: #ff4d5e; }
+  #popup.sp { font-size: 1.0em; }
+  #popup.show { animation: pop 1.3s ease-out forwards; }
+  @keyframes pop {
+    0%   { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+    12%  { opacity: 1; transform: scale(1.25) rotate(2deg); }
+    24%  { transform: scale(1.0) rotate(-1deg); }
+    75%  { opacity: 1; transform: scale(1.0); }
+    100% { opacity: 0; transform: scale(1.1) translateY(-0.4em); }
+  }
+  #balance {
+    position: absolute; left: 50%; bottom: 4.5%;
+    width: 34%; height: 0.55em; margin-left: -17%;
+    background: linear-gradient(90deg, #ff3b30 0%, #ffd91c 22%, #38e07d 44%, #38e07d 56%, #ffd91c 78%, #ff3b30 100%);
+    border: 2px solid #14041c; border-radius: 99px;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  #balance.on { opacity: 1; }
+  #bal-needle {
+    position: absolute; top: -0.45em; width: 0; height: 0; left: 50%;
+    border-left: 0.42em solid transparent; border-right: 0.42em solid transparent;
+    border-top: 0.85em solid #fff;
+    filter: drop-shadow(0 1px 0 #14041c) drop-shadow(0 -1px 0 #14041c);
+    transform: translateX(-50%);
+  }
+  #goals { font-size: 0.58em; color: #9ff2ff; margin-top: 0.35em; }
+  #goalpop {
+    position: absolute; left: 0; right: 0; top: 19.5%;
+    text-align: center; font-size: 0.95em; color: #38e07d;
+    opacity: 0; transform: scale(0.5);
+  }
+  #goalpop.show { animation: pop 1.8s ease-out forwards; }
+  #res-stats { font-size: 0.56em; color: #9ff2ff; margin-top: 0.5em; }
+  #res-goals { font-size: 0.5em; color: #cfa9ff; margin-top: 0.6em; line-height: 1.55; }
+  #res-goals .rg-cols {
+    column-count: 2; column-gap: 2.4em; text-align: left; margin-top: 0.4em;
+  }
+  #res-goals .rg-cols div { break-inside: avoid; }
+  #res-goals b { color: #38e07d; }
+  #res-goals .dim { opacity: 0.5; }
+  #paused {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(10, 4, 24, 0.4);
+    font-size: 2.4em; color: #fff;
+  }
+  #timer {
+    position: absolute; top: 3%; left: 50%;
+    transform: translateX(-50%) skewX(-6deg);
+    font-size: 1.5em; color: #fff;
+  }
+  #timer.low { color: #ff4d5e; animation: blink 0.5s steps(2) infinite; }
+  #results {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 4, 24, 0.55); text-align: center;
+  }
+  #results h2 {
+    margin: 0 0 0.2em; font-size: 1.9em; font-style: italic; font-weight: 900;
+    color: #ffd91c; transform: skewX(-8deg) rotate(-2deg);
+  }
+  #res-score { font-size: 1.35em; color: #fff; }
+  #res-best { font-size: 0.7em; color: #ffb3d1; margin-top: 0.3em; }
+  #res-medals {
+    font-size: 0.62em; color: #cfa9ff; margin-top: 0.6em; line-height: 1.3;
+    display: flex; gap: 1.8em; justify-content: center;
+  }
+  #res-medals b { color: #ffd91c; }
+  #res-medals .dim { opacity: 0.45; }
+  #results .press { margin-top: 0.8em; font-size: 0.72em; color: #fff; animation: blink 1.1s steps(2) infinite; }
+  #hint {
+    position: absolute; right: 3.5%; bottom: 3.5%;
+    font-size: 0.55em; color: #cfa9ff; text-align: right; line-height: 1.5;
+    font-family: "Arial Narrow", Arial, sans-serif; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    text-shadow: 0 2px 0 #14041c;
+    transition: opacity 1s;
+  }
+  /* the title's own control list says it all — the in-run reminder would just
+     collide with PRESS ANY KEY */
+  #hud:has(#title) #hint { opacity: 0; }
+  #title {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 4, 24, 0.45);
+    text-align: center;
+  }
+  #title h1 {
+    margin: 0; font-size: 4.1em; font-style: italic; font-weight: 900;
+    transform: skewX(-8deg) rotate(-2deg);
+    background: linear-gradient(180deg, #ffe94d 15%, #ff9b2e 48%, #e6266e 85%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: #ffd91c;
+    filter: drop-shadow(3px 4px 0 #14041c);
+    line-height: 0.95;
+  }
+  #title .sub {
+    font-size: 0.85em; color: #9ff2ff; margin: 0.45em 0 0.85em;
+    transform: skewX(-6deg);
+  }
+  #title .ctl {
+    font-family: "Arial Narrow", Arial, sans-serif; font-weight: 700;
+    font-size: 0.58em; line-height: 1.6; color: #ffd7f0;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    text-shadow: 0 2px 0 #14041c;
+    transition: opacity 0.35s;
+  }
+  /* browsing the garage: the wall of controls gets out of the way so you can
+     actually look at the bike you're picking */
+  #title.browsing .ctl { opacity: 0.06; }
+  #title.browsing { background: rgba(10, 4, 24, 0.18); }
+  #title .ctl b { color: #ffd91c; }
+  #title .press {
+    margin-top: 0.75em; font-size: 0.8em; color: #fff;
+    animation: blink 1.1s steps(2) infinite;
+  }
+  /* the garage: pick a bike before you drop in */
+  #bikesel { display: flex; flex-direction: column; align-items: center; margin: 0 0 0.7em; }
+  #bs-row {
+    display: flex; align-items: center; gap: 0.55em;
+    font-size: 1.05em; font-weight: 900; font-style: italic;
+    text-shadow: 0 3px 0 #14041c;
+  }
+  #bs-name { color: #ffd91c; min-width: 6.6em; letter-spacing: 0.03em; }
+  .bs-arrow {
+    color: #9ff2ff; font-size: 0.72em; cursor: pointer; user-select: none;
+    animation: blink 1.6s steps(2) infinite;
+  }
+  #bs-blurb, #bs-stats {
+    font-family: "Arial Narrow", Arial, sans-serif; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; text-shadow: 0 2px 0 #14041c;
+  }
+  #bs-blurb { font-size: 0.5em; color: #ffd7f0; margin-top: 0.15em; }
+  #bs-stats { font-size: 0.46em; color: #cfa9ff; margin-top: 0.4em; display: flex; gap: 1.1em; }
+  #bs-stats i { font-style: normal; color: #9ff2ff; margin-right: 0.35em; }
+  #bs-stats .on { color: #38e07d; letter-spacing: 0.06em; }
+  #bs-stats .off { opacity: 0.28; letter-spacing: 0.06em; }
+  #res-bike {
+    font-size: 0.52em; color: #ffd7f0; margin-top: 0.7em;
+    letter-spacing: 0.08em;
+  }
+  #res-bike b { color: #ffd91c; }
+  #res-bike .bs-arrow { font-size: 0.9em; }
+  @keyframes blink { 50% { opacity: 0.15; } }
+  #touch { position: absolute; inset: 0; display: none; pointer-events: none; }
+  #touch div {
+    position: absolute; bottom: 4%; pointer-events: auto;
+    width: 3.4em; height: 3.4em; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.10); border: 2px solid rgba(255, 255, 255, 0.35);
+    color: #fff; font-size: 1em; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; text-shadow: 0 2px 0 #14041c;
+  }
+  #touch div.held { background: rgba(255, 217, 28, 0.35); }
+  #tL { left: 4%; }  #tR { left: 22%; }
+  #tB { right: 4%; bottom: 20% !important; font-size: 0.7em !important; }
+  #tP { right: 22%; } #tW { right: 4%; }
+  #tH { right: 22%; bottom: 20% !important; font-size: 0.7em !important; }
+</style>
+
+<div id="wrap">
+  <canvas id="cv" width="960" height="540"></canvas>
+  <div id="hud">
+    <div id="scorebox" class="thps"><div id="score">0</div><div id="hi">BEST COMBO 0</div><div id="goals">GOALS 0/6</div></div>
+    <div id="speed" class="thps">0<span style="font-size:0.6em"> KM/H</span></div>
+    <div id="stance" class="thps">◄ SWITCH</div>
+    <div id="combo" class="thps"><div id="combo-tricks"></div><div id="combo-pts"></div></div>
+    <div id="popup" class="thps"></div>
+    <div id="goalpop" class="thps"></div>
+    <div id="paused" class="thps">PAUSED</div>
+    <div id="balance"><div id="bal-needle"></div></div>
+    <div id="timer" class="thps">2:00</div>
+    <div id="results">
+      <h2 class="thps">TIME'S UP!</h2>
+      <div id="res-score" class="thps">0</div>
+      <div id="res-best" class="thps">BEST RUN 0</div>
+      <div id="res-stats" class="thps"></div>
+      <div id="res-medals"></div>
+      <div id="res-goals" class="thps"></div>
+      <div id="res-bike" class="thps"></div>
+      <div class="press thps">PRESS R OR SPACE TO RIDE AGAIN</div>
+    </div>
+    <div id="hint">
+      SPACE brake &nbsp;·&nbsp; &uarr; pedal (mash = wheelie) &nbsp;·&nbsp; SHIFT hop<br>
+      &larr;&rarr; steer / pivot / spin &nbsp;·&nbsp; &darr; lean back &nbsp;·&nbsp; a 180 puts you SWITCH<br>
+      hop mid-endo = POGO &nbsp;·&nbsp; R reset &nbsp;·&nbsp; M mute &nbsp;·&nbsp; P pause
+    </div>
+    <div id="title">
+      <h1>ENDO!</h1>
+      <div class="sub thps">FRONT&nbsp;BRAKE&nbsp;FREESTYLE</div>
+      <div id="bikesel">
+        <div id="bs-row" class="thps">
+          <span class="bs-arrow" id="bs-prev">&#9668;</span>
+          <span id="bs-name">STREET RAT</span>
+          <span class="bs-arrow" id="bs-next">&#9658;</span>
+        </div>
+        <div id="bs-blurb">does everything, excuses nothing</div>
+        <div id="bs-stats"></div>
+      </div>
+      <div class="ctl">
+        <b>&uarr; / W</b> — pedal · mash it for a <b>WHEELIE</b> &nbsp; <b>SHIFT / X</b> — bunny hop<br>
+        <b>SPACE</b> — front brake, your only brake · grab it at speed to <b>ENDO</b>, steer to <b>PIVOT</b><br>
+        <b>&darr; / S</b> — lean back · pull the nose up · bail out of a deep endo<br>
+        hold pedal or brake to auto-balance · a <b>180</b> leaves you <b>SWITCH</b> till the next one<br>
+        follow the painted runs · north up the boulevard, off the bank, onto the roof<br>
+        chain lines like 180 &rarr; pogo &rarr; pivot out for ★ signature bonuses<br>
+        2:00 on the clock — ride out clean to bank the combo &nbsp; <b>R</b> reset · <b>M</b> mute
+      </div>
+      <div class="press thps">&larr; &rarr; PICK YOUR BIKE · PRESS ANY OTHER KEY TO RIDE</div>
+    </div>
+    <div id="touch">
+      <div id="tL">&larr;</div><div id="tR">&rarr;</div>
+      <div id="tB">BRAKE</div><div id="tP">&uarr;</div><div id="tW">&darr;</div><div id="tH">HOP</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ================================================================
+//  ENDO! — front-brake freestyle. PS2-generation presentation:
+//  960x540 render target, MSAA, stable sub-pixel vertices, per-pixel
+//  lighting with specular chrome, smooth fog to a sunset horizon.
+//  No libraries.
+// ================================================================
+
+// ---------- tiny math ----------
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function wrapPi(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+let seed = 987654321;
+function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+
+function m4Mul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  }
+  return o;
+}
+function chain() { let m = arguments[0]; for (let i = 1; i < arguments.length; i++) m = m4Mul(m, arguments[i]); return m; }
+function m4T(x, y, z) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
+function m4RX(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
+function m4RY(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]); }
+function m4RZ(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]); }
+function m4Persp(fov, asp, n, f) {
+  const t = 1 / Math.tan(fov / 2), o = new Float32Array(16);
+  o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f);
+  return o;
+}
+function vSub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function vCross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function vNorm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+function vDot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function m4LookAt(e, c, up) {
+  const z = vNorm(vSub(e, c)), x = vNorm(vCross(up, z)), y = vCross(z, x);
+  return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -vDot(x,e),-vDot(y,e),-vDot(z,e),1]);
+}
+function applyM(m, p) {
+  return [m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12], m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13], m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]];
+}
+
+// ---------- webgl ----------
+const cv = document.getElementById('cv');
+const RW = 960, RH = 540;
+const gl = cv.getContext('webgl', { antialias: true });
+
+function mkShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function mkProg(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, mkShader(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, mkShader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+const prog = mkProg(`
+  attribute vec3 aP; attribute vec3 aN; attribute vec3 aC;
+  uniform mat4 uM, uVP;
+  varying vec3 vC; varying vec3 vN; varying vec3 vW; varying float vF;
+  void main() {
+    vec4 w = uM * vec4(aP, 1.0);
+    vN = normalize(mat3(uM) * aN);
+    vC = aC;
+    vW = w.xyz;
+    vec4 p = uVP * w;
+    vF = p.w;
+    gl_Position = p;
+  }`, `
+  precision mediump float;
+  varying vec3 vC; varying vec3 vN; varying vec3 vW; varying float vF;
+  uniform vec3 uFogCol; uniform vec3 uFog; // near, far, maxAmount
+  uniform float uAlpha;
+  uniform vec3 uL; uniform vec3 uEye; uniform float uSpec;
+  void main() {
+    // two-sided: nothing is culled, so a face seen from behind lights with the
+    // flipped normal. Lets open shells (ramp skirts, decks) be single polygons
+    // instead of two coplanar copies fighting for the same depth.
+    vec3 n = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);
+    float d = max(dot(n, uL), 0.0);
+    // hemisphere ambient + warm sun diffuse (matches the old vertex-lit levels)
+    vec3 col = vC * (0.44 + 0.11 * (n.y * 0.5 + 0.5) + 0.55 * d * vec3(1.08, 0.95, 0.82));
+    vec3 v = normalize(uEye - vW);
+    vec3 hv = normalize(uL + v);
+    col += vec3(1.0, 0.88, 0.72) * pow(max(dot(n, hv), 0.0), 26.0) * uSpec;
+    float f = clamp((vF - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0) * uFog.z;
+    gl_FragColor = vec4(mix(col, uFogCol, f), uAlpha);
+  }`);
+const U = {};
+['uM','uVP','uL','uEye','uSpec','uFogCol','uFog','uAlpha'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+const A = { aP: gl.getAttribLocation(prog, 'aP'), aN: gl.getAttribLocation(prog, 'aN'), aC: gl.getAttribLocation(prog, 'aC') };
+
+const skyProg = mkProg(`
+  attribute vec2 aP; varying vec2 vUv;
+  void main() { vUv = aP * 0.5 + 0.5; gl_Position = vec4(aP, 0.0, 1.0); }`, `
+  precision mediump float; varying vec2 vUv;
+  uniform vec3 uTop, uHor; uniform vec2 uSun;
+  void main() {
+    float t = vUv.y;
+    vec3 col = mix(uHor, uTop, smoothstep(0.24, 0.92, t));
+    vec2 d = vUv - uSun; d.x *= 1.7778;
+    float r = length(d);
+    col += vec3(1.0, 0.62, 0.38) * exp(-r * 1.9) * 0.18;   // wide bloom
+    col += vec3(1.0, 0.72, 0.42) * exp(-r * 5.5) * 0.6;
+    col = mix(col, vec3(1.0, 0.94, 0.72), smoothstep(0.058, 0.046, r));
+    // thin sunset cloud streaks drifting across the glow band
+    float cw = smoothstep(0.28, 0.36, t) * smoothstep(0.66, 0.48, t);
+    float streak = sin(vUv.y * 110.0 + sin(vUv.x * 6.0 + vUv.y * 9.0) * 3.0);
+    col = mix(col, vec3(0.42, 0.18, 0.42), smoothstep(0.45, 0.95, streak) * cw * 0.28);
+    vec2 g = floor(vUv * vec2(160.0, 60.0) + 7.0);
+    float h = fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5453);
+    col += vec3(0.85) * step(0.993, h) * smoothstep(0.55, 0.9, t);
+    // fine dither so the smooth gradient never bands
+    float dth = fract(sin(dot(vUv * vec2(917.0, 533.0), vec2(12.9898, 78.233))) * 43758.5453);
+    col += (dth - 0.5) * 0.012;
+    gl_FragColor = vec4(col, 1.0);
+  }`);
+const SU = { uTop: gl.getUniformLocation(skyProg,'uTop'), uHor: gl.getUniformLocation(skyProg,'uHor'), uSun: gl.getUniformLocation(skyProg,'uSun') };
+const skyA = gl.getAttribLocation(skyProg, 'aP');
+const skyBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+
+gl.enable(gl.DEPTH_TEST);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+// palette
+const SKY_TOP = [0.155, 0.075, 0.36], SKY_HOR = [0.95, 0.55, 0.32];
+const FOG_COL = [0.88, 0.49, 0.31];
+const LIGHT = vNorm([Math.sin(2.35), 0.55, Math.cos(2.35)]);
+const SUN_AZ = 2.35;
+
+// ---------- mesh builder ----------
+function MB() { this.a = []; }
+MB.prototype.tri = function (a, b, c, col) {
+  const n = vNorm(vCross(vSub(b, a), vSub(c, a)));
+  const A_ = this.a;
+  [a, b, c].forEach(p => A_.push(p[0], p[1], p[2], n[0], n[1], n[2], col[0], col[1], col[2]));
+};
+MB.prototype.quad = function (a, b, c, d, col) { this.tri(a, b, c, col); this.tri(a, c, d, col); };
+function jit(col, k) { const f = 1 + (rnd() - 0.5) * (k || 0.12); return [col[0] * f, col[1] * f, col[2] * f]; }
+MB.prototype.box = function (cx, cy, cz, sx, sy, sz, col, ry) {
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2, c = Math.cos(ry || 0), s = Math.sin(ry || 0);
+  const P = [];
+  for (let i = 0; i < 8; i++) {
+    const x = (i & 1 ? hx : -hx), y = (i & 2 ? hy : -hy), z = (i & 4 ? hz : -hz);
+    P.push([cx + x * c + z * s, cy + y, cz - x * s + z * c]);
+  }
+  this.quad(P[5], P[4], P[6], P[7], jit(col)); // top (y+)
+  this.quad(P[0], P[1], P[3], P[2], jit(col)); // bottom
+  this.quad(P[4], P[5], P[1], P[0], jit(col)); // back  (z-)
+  this.quad(P[6], P[2], P[3], P[7], jit(col)); // front (z+)
+  this.quad(P[4], P[0], P[2], P[6], jit(col)); // left
+  this.quad(P[1], P[5], P[7], P[3], jit(col)); // right
+};
+// round(ish) tube: octagonal cross-section
+MB.prototype.bar = function (a, b, r, col) {
+  const d = vNorm(vSub(b, a));
+  const ref = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const s = vNorm(vCross(d, ref)), u = vCross(s, d);
+  const N = 8, RA = [], RB = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i + 0.5) / N * Math.PI * 2, ci = Math.cos(t) * r, si = Math.sin(t) * r;
+    const ox = s[0] * ci + u[0] * si, oy = s[1] * ci + u[1] * si, oz = s[2] * ci + u[2] * si;
+    RA.push([a[0] + ox, a[1] + oy, a[2] + oz]);
+    RB.push([b[0] + ox, b[1] + oy, b[2] + oz]);
+  }
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    this.quad(RA[i], RB[i], RB[j], RA[j], col);
+  }
+  for (let i = 1; i < N - 1; i++) {
+    this.tri(RA[0], RA[i], RA[i + 1], col);
+    this.tri(RB[0], RB[i + 1], RB[i], col);
+  }
+};
+// cylinder along local X axis (wheels)
+MB.prototype.cylX = function (cx, cy, cz, r, w, n, col) {
+  const h = w / 2;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    const y0 = Math.cos(t0) * r, z0 = Math.sin(t0) * r, y1 = Math.cos(t1) * r, z1 = Math.sin(t1) * r;
+    this.quad([cx-h, cy+y0, cz+z0], [cx-h, cy+y1, cz+z1], [cx+h, cy+y1, cz+z1], [cx+h, cy+y0, cz+z0], col);
+    this.tri([cx+h, cy, cz], [cx+h, cy+y0, cz+z0], [cx+h, cy+y1, cz+z1], col);
+    this.tri([cx-h, cy, cz], [cx-h, cy+y1, cz+z1], [cx-h, cy+y0, cz+z0], col);
+  }
+};
+MB.prototype.cylY = function (cx, cy, cz, r, h, n, colS, colT) {
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    const x0 = Math.cos(t0) * r, z0 = Math.sin(t0) * r, x1 = Math.cos(t1) * r, z1 = Math.sin(t1) * r;
+    this.quad([cx+x0, cy, cz+z0], [cx+x0, cy+h, cz+z0], [cx+x1, cy+h, cz+z1], [cx+x1, cy, cz+z1], jit(colS, 0.08));
+    if (colT) this.tri([cx, cy+h, cz], [cx+x1, cy+h, cz+z1], [cx+x0, cy+h, cz+z0], colT);
+  }
+};
+MB.prototype.cone = function (cx, cy, cz, r, h, n, col) {
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    this.tri([cx, cy + h, cz], [cx + Math.cos(t1)*r, cy, cz + Math.sin(t1)*r], [cx + Math.cos(t0)*r, cy, cz + Math.sin(t0)*r], jit(col, 0.1));
+  }
+};
+// faceted lat/long ball with vertex jitter — foliage, bags, anything organic
+MB.prototype.blob = function (cx, cy, cz, rx, ry, rz, n, m, col, jk) {
+  const P = [];
+  for (let j = 0; j <= m; j++) {
+    const ph = j / m * Math.PI - Math.PI / 2, row = [];
+    for (let i = 0; i < n; i++) {
+      const th = i / n * Math.PI * 2;
+      const f = 1 + (jk ? (rnd() - 0.5) * jk : 0);
+      row.push([cx + Math.cos(ph) * Math.sin(th) * rx * f,
+                cy + Math.sin(ph) * ry * f,
+                cz + Math.cos(ph) * Math.cos(th) * rz * f]);
+    }
+    P.push(row);
+  }
+  for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
+    const i2 = (i + 1) % n;
+    if (j > 0) this.tri(P[j][i], P[j][i2], P[j + 1][i2], jit(col, 0.1));
+    if (j < m - 1) this.tri(P[j][i], P[j + 1][i2], P[j + 1][i], jit(col, 0.1));
+  }
+};
+// smooth-shaded ellipsoid with true normals — shoulder caps, joints, anything
+// that should read as a ball of muscle instead of a corner
+MB.prototype.orb = function (cx, cy, cz, rx, ry, rz, n, m, col) {
+  const P = [], N = [];
+  for (let j = 0; j <= m; j++) {
+    const ph = j / m * Math.PI - Math.PI / 2, rowP = [], rowN = [];
+    for (let i = 0; i < n; i++) {
+      const th = i / n * Math.PI * 2;
+      const sx = Math.cos(ph) * Math.sin(th), sy = Math.sin(ph), sz = Math.cos(ph) * Math.cos(th);
+      rowP.push([cx + sx * rx, cy + sy * ry, cz + sz * rz]);
+      rowN.push(vNorm([sx / rx, sy / ry, sz / rz]));
+    }
+    P.push(rowP); N.push(rowN);
+  }
+  for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
+    const k = (i + 1) % n;
+    if (j > 0) this.raw(P[j][i], P[j][k], P[j + 1][k], N[j][i], N[j][k], N[j + 1][k], col);
+    if (j < m - 1) this.raw(P[j][i], P[j + 1][k], P[j + 1][i], N[j][i], N[j + 1][k], N[j + 1][i], col);
+  }
+};
+// smooth-shaded tapered capsule — limbs read as round muscle rather than as a
+// length of octagonal pipe, and the domed ends mean a joint never shows a disc
+MB.prototype.limb = function (a, b, ra, rb, col) {
+  const d = vNorm(vSub(b, a));
+  const ref = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const s = vNorm(vCross(d, ref)), u = vCross(s, d);
+  const N = 10, PA = [], PB = [], NR = [];
+  for (let i = 0; i < N; i++) {
+    const t = i / N * Math.PI * 2, ci = Math.cos(t), si = Math.sin(t);
+    const nv = [s[0] * ci + u[0] * si, s[1] * ci + u[1] * si, s[2] * ci + u[2] * si];
+    NR.push(nv);
+    PA.push([a[0] + nv[0] * ra, a[1] + nv[1] * ra, a[2] + nv[2] * ra]);
+    PB.push([b[0] + nv[0] * rb, b[1] + nv[1] * rb, b[2] + nv[2] * rb]);
+  }
+  const tipA = [a[0] - d[0] * ra * 0.7, a[1] - d[1] * ra * 0.7, a[2] - d[2] * ra * 0.7];
+  const tipB = [b[0] + d[0] * rb * 0.7, b[1] + d[1] * rb * 0.7, b[2] + d[2] * rb * 0.7];
+  const nA = [-d[0], -d[1], -d[2]];
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    this.raw(PA[i], PB[i], PB[j], NR[i], NR[i], NR[j], col);
+    this.raw(PA[i], PB[j], PA[j], NR[i], NR[j], NR[j], col);
+    this.raw(tipA, PA[j], PA[i], nA, NR[j], NR[i], col);
+    this.raw(tipB, PB[i], PB[j], d, NR[i], NR[j], col);
+  }
+};
+MB.prototype.groundQuad = function (x0, z0, x1, z1, y, col) {
+  this.quad([x0, y, z0], [x0, y, z1], [x1, y, z1], [x1, y, z0], col);
+};
+// quad with per-vertex colors — lets ground mottling blend smoothly across cells
+MB.prototype.vquad = function (a, b, c, d, ca, cb, cc, cd) {
+  const n = vNorm(vCross(vSub(b, a), vSub(c, a)));
+  const A_ = this.a;
+  const push = (p, col) => A_.push(p[0], p[1], p[2], n[0], n[1], n[2], col[0], col[1], col[2]);
+  push(a, ca); push(b, cb); push(c, cc);
+  push(a, ca); push(c, cc); push(d, cd);
+};
+// raw triangle with explicit per-vertex normals + colors (smooth-shaded domes, tires)
+MB.prototype.raw = function (a, b, c, na, nb, nc, ca, cb, cc) {
+  cb = cb || ca; cc = cc || ca;
+  const A_ = this.a;
+  A_.push(a[0], a[1], a[2], na[0], na[1], na[2], ca[0], ca[1], ca[2]);
+  A_.push(b[0], b[1], b[2], nb[0], nb[1], nb[2], cb[0], cb[1], cb[2]);
+  A_.push(c[0], c[1], c[2], nc[0], nc[1], nc[2], cc[0], cc[1], cc[2]);
+};
+// cylinder along local Z (wheels of cars parked along the x axis)
+MB.prototype.cylZ = function (cx, cy, cz, r, w, n, col) {
+  const h = w / 2;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    const x0 = Math.cos(t0) * r, y0 = Math.sin(t0) * r, x1 = Math.cos(t1) * r, y1 = Math.sin(t1) * r;
+    this.quad([cx+x0, cy+y0, cz-h], [cx+x1, cy+y1, cz-h], [cx+x1, cy+y1, cz+h], [cx+x0, cy+y0, cz+h], col);
+    this.tri([cx, cy, cz+h], [cx+x0, cy+y0, cz+h], [cx+x1, cy+y1, cz+h], col);
+    this.tri([cx, cy, cz-h], [cx+x1, cy+y1, cz-h], [cx+x0, cy+y0, cz-h], col);
+  }
+};
+MB.prototype.mesh = function (dynamic) {
+  const data = new Float32Array(this.a);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, data, dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+  return { buf: buf, n: data.length / 9 };
+};
+
+const IDENT = m4T(0, 0, 0);
+function drawMesh(m, mat, fogMax, alpha, spec) {
+  if (!m.n) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+  gl.vertexAttribPointer(A.aP, 3, gl.FLOAT, false, 36, 0);
+  gl.vertexAttribPointer(A.aN, 3, gl.FLOAT, false, 36, 12);
+  gl.vertexAttribPointer(A.aC, 3, gl.FLOAT, false, 36, 24);
+  gl.uniformMatrix4fv(U.uM, false, mat || IDENT);
+  gl.uniform3f(U.uFog, 60, 210, fogMax === undefined ? 1 : fogMax);
+  gl.uniform1f(U.uAlpha, alpha === undefined ? 1 : alpha);
+  gl.uniform1f(U.uSpec, spec === undefined ? 0.12 : spec);
+  gl.drawArrays(gl.TRIANGLES, 0, m.n);
+}
+
+// ================================================================
+//  WORLD
+// ================================================================
+const ARENA = 38;      // half-size of the plaza proper
+const BOUND = 52.6;    // hard edge of the rideable block (the building line)
+// drop-in point: bottom of the boulevard, pointed north straight down the hero line
+// (rollers → kicker gap → open hub → bank → the depot roof) so the run reads on sight
+const SPAWN = { x: 0, z: -31.5, h: 0 };
+const COL_ASPHALT_A = [0.335, 0.315, 0.375], COL_ASPHALT_B = [0.305, 0.29, 0.345];
+const COL_PAINT = [0.82, 0.79, 0.72], COL_YELLOW = [0.85, 0.68, 0.16];
+
+const world = new MB();
+// ---- surface palette: value-noise so mottling blends smoothly across cells ----
+function vhash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  return vhash(xi, zi) * (1 - u) * (1 - v) + vhash(xi + 1, zi) * u * (1 - v)
+       + vhash(xi, zi + 1) * (1 - u) * v + vhash(xi + 1, zi + 1) * u * v;
+}
+function concCol(x, z) {   // plaza: poured concrete, broad weathering + fine speckle
+  const m = vnoise(x / 7 + 3.7, z / 7) - 0.5;
+  const f = vnoise(x / 1.6, z / 1.6 + 9.1) - 0.5;
+  const k = 1 + m * 0.15 + f * 0.06;
+  return [0.375 * k, 0.36 * k, 0.41 * k];
+}
+function asphCol(x, z) {   // street asphalt: darker, patchier
+  const m = vnoise(x / 9 + 11.2, z / 9 + 4.4) - 0.5;
+  const f = vnoise(x / 2.2 + 1.3, z / 2.2) - 0.5;
+  const k = 1 + m * 0.2 + f * 0.09;
+  return [0.27 * k, 0.26 * k, 0.305 * k];
+}
+function walkCol(x, z) {   // sidewalk: lighter cement slabs
+  const m = vnoise(x / 5 + 7.7, z / 5 + 2.2) - 0.5;
+  const k = 1 + m * 0.13;
+  return [0.455 * k, 0.435 * k, 0.475 * k];
+}
+function lotCol(x, z) {    // far ground fading into the haze
+  const m = vnoise(x / 11 + 5.5, z / 11 + 8.8) - 0.5;
+  const k = 1 + m * 0.16;
+  return [0.235 * k, 0.22 * k, 0.27 * k];
+}
+function patch(mb, x0, z0, x1, z1, y, cell, colFn) {
+  for (let x = x0; x < x1; x += cell) {
+    const xb = Math.min(x + cell, x1);
+    for (let z = z0; z < z1; z += cell) {
+      const zb = Math.min(z + cell, z1);
+      mb.vquad([x, y, z], [x, y, zb], [xb, y, zb], [xb, y, z],
+        colFn(x, z), colFn(x, zb), colFn(xb, zb), colFn(xb, z));
+    }
+  }
+}
+// square annulus of ground (ring roads, sidewalks) built from 4 crisp-edged patches
+function ring(mb, r0, r1, y, cell, colFn) {
+  patch(mb, -r1, r0, r1, r1, y, cell, colFn);    // north
+  patch(mb, -r1, -r1, r1, -r0, y, cell, colFn);  // south
+  patch(mb, r0, -r0, r1, r0, y, cell, colFn);    // east
+  patch(mb, -r1, -r0, -r0, r0, y, cell, colFn);  // west
+}
+
+// plaza floor: poured concrete with expansion joints every 4m
+patch(world, -39.6, -39.6, 39.6, 39.6, 0, 2, concCol);
+const COL_JOINT = [0.295, 0.28, 0.33];
+for (let j = -36; j <= 36; j += 4) {
+  world.groundQuad(j - 0.035, -38, j + 0.035, 38, 0.0115, COL_JOINT);
+  world.groundQuad(-38, j - 0.035, 38, j + 0.035, 0.0115, COL_JOINT);
+}
+// weathering decals: oil stains blend out to the slab color at their rim
+function stain(cx, cz, r, dk) {
+  const n = 8, up = [0, 1, 0];
+  const cc = concCol(cx, cz).map(v => v * dk);
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, rr = r * (0.65 + vhash(i * 3.1, cx + cz) * 0.6);
+    pts.push([cx + Math.cos(a) * rr, 0.0105, cz + Math.sin(a) * rr]);
+  }
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[i], p1 = pts[(i + 1) % n];
+    world.raw([cx, 0.0105, cz], p1, p0, up, up, up, cc, concCol(p1[0], p1[2]), concCol(p0[0], p0[2]));
+  }
+}
+stain(9, 3, 1.6, 0.8); stain(-4, -12, 2.2, 0.86); stain(20, -15, 1.3, 0.78);
+stain(-26, 18, 1.8, 0.84); stain(14, 25, 2.0, 0.87); stain(-12, 22, 1.2, 0.8);
+stain(2, -27, 1.5, 0.83); stain(31, 18, 1.7, 0.85);
+// hairline cracks wandering across slabs
+function crack(x, z, ang, n) {
+  let a = ang;
+  for (let i = 0; i < n; i++) {
+    const len = 0.7 + vhash(i * 1.7, x) * 0.9;
+    const nx = x + Math.sin(a) * len, nz = z + Math.cos(a) * len;
+    const c = Math.cos(a), s = Math.sin(a), w = 0.022;
+    world.quad([x - c * w, 0.011, z + s * w], [x + c * w, 0.011, z - s * w],
+               [nx + c * w, 0.011, nz - s * w], [nx - c * w, 0.011, nz + s * w], [0.27, 0.255, 0.3]);
+    x = nx; z = nz; a += (vhash(i * 7.7, z) - 0.5) * 1.3;
+  }
+}
+crack(-8, -6, 0.7, 5); crack(16, 14, 2.4, 6); crack(-22, -14, -0.8, 5); crack(6, 17, 3.6, 4);
+// manhole covers + a storm drain by the fountain
+function manhole(cx, cz) {
+  const n = 12, r = 0.5;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    world.tri([cx, 0.013, cz], [cx + Math.cos(t1) * r, 0.013, cz + Math.sin(t1) * r],
+              [cx + Math.cos(t0) * r, 0.013, cz + Math.sin(t0) * r], [0.175, 0.16, 0.195]);
+  }
+  paintRing(cx, cz, r + 0.05, 0.045, [0.24, 0.225, 0.27]);
+}
+function drainGrate(cx, cz) {
+  world.groundQuad(cx - 0.65, cz - 0.45, cx + 0.65, cz + 0.45, 0.012, [0.15, 0.14, 0.18]);
+  for (let i = -2; i <= 2; i++)
+    world.groundQuad(cx - 0.55, cz + i * 0.16 - 0.03, cx + 0.55, cz + i * 0.16 + 0.03, 0.013, [0.3, 0.29, 0.34]);
+}
+// painted border ring
+for (const s of [-1, 1]) {
+  world.groundQuad(-36.8, s * 36.5, 36.8, s * 36.8, 0.015, COL_YELLOW);
+  world.groundQuad(s * 36.5, -36.8, s * 36.8, 36.8, 0.015, COL_YELLOW);
+}
+// pivot practice circles
+function paintRing(cx, cz, r, w, col) {
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    world.quad(
+      [cx + Math.cos(t0) * (r - w), 0.015, cz + Math.sin(t0) * (r - w)],
+      [cx + Math.cos(t0) * (r + w), 0.015, cz + Math.sin(t0) * (r + w)],
+      [cx + Math.cos(t1) * (r + w), 0.015, cz + Math.sin(t1) * (r + w)],
+      [cx + Math.cos(t1) * (r - w), 0.015, cz + Math.sin(t1) * (r - w)], col);
+  }
+}
+// pivot practice circles, off in the open corners of the plaza where they don't
+// fight the run markings
+for (const c of [[-16, -26], [21, 15]]) {
+  paintRing(c[0], c[1], 3.2, 0.22, COL_PAINT);
+  paintRing(c[0], c[1], 0.4, 0.4, COL_PAINT);
+}
+// slalom dashes down the strip between the boulevard and the east shoulder
+for (let z = -20; z < 12; z += 3) world.groundQuad(8.9, z, 9.1, z + 1.4, 0.015, COL_PAINT);
+manhole(5, -8); manhole(-7, -25); manhole(18, 6); manhole(-30, 8);
+drainGrate(0, -5.2); drainGrate(4.6, 2.6);
+
+// ---- elevation ----
+// The plaza is laid out as four runs that each chain three or more features and
+// spit you back into the open hub with speed:
+//   L1 THE BOULEVARD  x +-5, south->north : terrace stairs, rollers, kicker gap,
+//                     hub, the walkway, the north bank, and out over the street
+//                     onto the DEPOT roof.
+//   L2 THE WEST RUN   x ~ -24            : funbox, roll-in, halfpipe.
+//   L3 THE EAST WALL  x ~ 31             : pyramid, spine, the east quarter pipe
+//                                          running alongside the whole lane.
+//   L4 THE SOUTH RUN  z ~ -34            : bank up onto the terrace, across, and
+//                                          off the stairs or the east edge.
+// Everything below is kept clear of those lanes — see the paint pass and the
+// lane-clearance sweep in tests/test4.js.
+const LANE_W = 4.5;                                                      // half-width of the boulevard
+const KICK = { x0: -LANE_W, x1: LANE_W, az0: -13, az1: -8.5, bz0: -4.5, bz1: 0, h: 1.6 };
+const BANK = { x0: -17, x1: 20, z0: 31, z1: 37.3, h: 3.0 };
+const FUN = { cx: -24, cz: 8, ax: 3, az: 3, h: 1.2, w: 2.6 };
+const TERR = { x0: -14, x1: 14, z0: -37.2, z1: -31, h: 0.8, ramp: 1.6, bx: -20 };  // south terrace, west bank onto the deck
+const PYR = { cx: 28, cz: -23, t: 1.1, w: 3.6, h: 1.5 };                 // SE pyramid, sat across the east lane
+const SPINE = { x0: 25, x1: 32, z0: 20, z1: 27, h: 1.3 };                // NE spine, ridge across the east lane
+const ROLL = { x0: -LANE_W, x1: LANE_W, z0: -28, z1: -16, h: 0.45, n: 3 };  // boulevard rhythm rollers
+// the depot across the north street: gap the kiosk, land on the roof, gap the
+// alley, and ride the end ramps back down to the road
+const DEPOT = { x0: -17, x1: 17, z0: 43.4, z1: 51.5, h: 2.9, ax0: 7.2, ax1: 10.0, ramp: 6.5 };
+function rollH(x, z) {
+  if (x <= ROLL.x0 || x >= ROLL.x1 || z <= ROLL.z0 || z >= ROLL.z1) return 0;
+  const u = (z - ROLL.z0) / (ROLL.z1 - ROLL.z0);
+  const t = clamp(Math.min(x - ROLL.x0, ROLL.x1 - x) / 1.2, 0, 1);
+  return ROLL.h * 0.5 * (1 - Math.cos(u * ROLL.n * Math.PI * 2)) * t;
+}
+function depotH(x, z) {
+  if (z <= DEPOT.z0 || z >= DEPOT.z1) return 0;
+  if (x > DEPOT.x0 && x < DEPOT.x1) return (x > DEPOT.ax0 && x < DEPOT.ax1) ? 0 : DEPOT.h;   // roof, minus the alley
+  if (x >= DEPOT.x1 && x < DEPOT.x1 + DEPOT.ramp) return DEPOT.h * (1 - (x - DEPOT.x1) / DEPOT.ramp);
+  if (x <= DEPOT.x0 && x > DEPOT.x0 - DEPOT.ramp) return DEPOT.h * (1 - (DEPOT.x0 - x) / DEPOT.ramp);
+  return 0;
+}
+// quarter pipes: circular transitions capped at ~56° so they stay rideable,
+// with a flat deck behind each lip you can roll onto or drop in from
+const EQP = { x0: 34.4, z0: -15, z1: 19, r: 4.8 };                       // east wall QP, faces the plaza
+const HPIPE = { x0: -31, x1: -17, zA: 23.6, zB: 28.4, r: 4.2 };          // NW halfpipe, ride it along z
+for (const q of [EQP, HPIPE]) {
+  q.w = q.r * 0.83;                                    // horizontal run of the transition (sin 56°)
+  q.top = q.r - Math.sqrt(q.r * q.r - q.w * q.w);      // lip height
+  q.deck = 1.9;
+}
+// roll-ins: banks up onto both halfpipe decks. Without them each deck is a 1.86m
+// wall you bounce off, which is why the west side never flowed — now you can
+// arrive at speed from either end, drop in, and pump straight through.
+HPIPE.dA = HPIPE.zA - HPIPE.w - HPIPE.deck;            // south deck back edge
+HPIPE.dB = HPIPE.zB + HPIPE.w + HPIPE.deck;            // north deck back edge
+const ROLLIN = 3.2;                                    // run of each roll-in bank
+function qpProf(d, q) { return d <= 0 ? 0 : d >= q.w ? q.top : q.r - Math.sqrt(q.r * q.r - d * d); }
+function qpH(x, z) {
+  let h = 0;
+  if (z > EQP.z0 && z < EQP.z1 && x > EQP.x0 && x < EQP.x0 + EQP.w + EQP.deck)
+    h = qpProf(Math.min(x - EQP.x0, EQP.w), EQP);
+  if (x > HPIPE.x0 && x < HPIPE.x1) {
+    if (z < HPIPE.zA && z > HPIPE.dA) h = Math.max(h, qpProf(Math.min(HPIPE.zA - z, HPIPE.w), HPIPE));
+    if (z > HPIPE.zB && z < HPIPE.dB) h = Math.max(h, qpProf(Math.min(z - HPIPE.zB, HPIPE.w), HPIPE));
+    // banks feeding the two decks
+    if (z <= HPIPE.dA && z > HPIPE.dA - ROLLIN) h = Math.max(h, HPIPE.top * (1 - (HPIPE.dA - z) / ROLLIN));
+    if (z >= HPIPE.dB && z < HPIPE.dB + ROLLIN) h = Math.max(h, HPIPE.top * (1 - (z - HPIPE.dB) / ROLLIN));
+  }
+  return h;
+}
+function inPipe(x, z) {
+  return (z > EQP.z0 - 0.6 && z < EQP.z1 + 0.6 && x > EQP.x0 - 0.6) ||
+         (x > HPIPE.x0 - 0.6 && x < HPIPE.x1 + 0.6 && z > HPIPE.zA - HPIPE.w - 0.6 && z < HPIPE.zB + HPIPE.w + 0.6);
+}
+// steepest rideable slope: transitions allow near-vert, everywhere else the
+// old 43° limit keeps vertical drop faces bouncing you off instead of wall-crawling
+function slopeLim(x, z) { return inPipe(x, z) ? 1.01 : 0.75; }
+// ---- garden beds: low kerbed dirt planters. Everything green in the plaza is
+// planted in one of these, laid out like real civic landscaping — matched pairs
+// framing the fountain, rows lining the walkways, gardens at the tree corners.
+// The kerb is low enough to roll straight over; the bushes on top are all soft.
+const BED_H = 0.2;
+const BEDS = [
+  // [x, z, halfX, halfZ, bushes] — all of these sit BETWEEN the runs, never in one
+  [-14, -8.5, 3.0, 0.9, 5], [-14, -19.5, 3.0, 0.9, 5],  // fountain garden, north & south
+  [-18.6, -14, 0.9, 2.6, 4], [-9.4, -14, 0.9, 2.6, 4],  // fountain garden, west & east
+  [12, 22.5, 1.2, 5.0, 8], [-12, 22.5, 1.2, 5.0, 8],    // the walkway that funnels you at the bank
+  [16, -8, 1.0, 3.0, 5], [20, 4, 3.0, 1.0, 5],          // hub's east shoulder
+  [-10, 6, 2.4, 0.9, 5],                                // hub's west shoulder
+  [30.5, 33, 2.0, 1.1, 4], [-30.5, -33, 2.0, 1.1, 4],   // tree corners
+  [33, -30.2, 2.4, 1.0, 4], [-34, 5, 1.0, 2.6, 4],
+  [30, 51.4, 2.5, 0.85, 5], [-51.4, 6, 0.85, 3.4, 6], [51.4, -24, 0.85, 3.0, 5]  // out on the sidewalk
+].map(b => ({ x: b[0], z: b[1], hx: b[2], hz: b[3], n: b[4], base: 0 }));
+let bedsLive = false;   // bases are sampled from the terrain below, so beds only
+                        // join the height field once that sampling pass is done
+function groundH(x, z) {
+  let h = 0;
+  // boulevard kicker gap: launch ramp, 4m of nothing, landing ramp
+  if (x > KICK.x0 && x < KICK.x1) {
+    if (z > KICK.az0 && z < KICK.az1) h = Math.max(h, (z - KICK.az0) / (KICK.az1 - KICK.az0) * KICK.h);
+    if (z > KICK.bz0 && z < KICK.bz1) h = Math.max(h, (KICK.bz1 - z) / (KICK.bz1 - KICK.bz0) * KICK.h);
+  }
+  if (x > BANK.x0 && x < BANK.x1 && z > BANK.z0 && z < BANK.z1)
+    h = Math.max(h, (z - BANK.z0) / (BANK.z1 - BANK.z0) * BANK.h);
+  const d = Math.max(Math.abs(x - FUN.cx) - FUN.ax, Math.abs(z - FUN.cz) - FUN.az);
+  if (d < FUN.w) h = Math.max(h, d <= 0 ? FUN.h : FUN.h * (1 - d / FUN.w));
+  if (z > TERR.z0 && z < TERR.z1 + TERR.ramp) {
+    if (x > TERR.x0 && x < TERR.x1) {
+      if (z < TERR.z1) h = Math.max(h, TERR.h);
+      else h = Math.max(h, TERR.h * (1 - (z - TERR.z1) / TERR.ramp));                     // stairs
+    } else if (x > TERR.bx && x <= TERR.x0 && z < TERR.z1) {
+      h = Math.max(h, TERR.h * (x - TERR.bx) / (TERR.x0 - TERR.bx));                      // west bank onto the deck
+    }
+  }
+  const dp = Math.max(Math.abs(x - PYR.cx), Math.abs(z - PYR.cz)) - PYR.t;
+  if (dp < PYR.w) h = Math.max(h, dp <= 0 ? PYR.h : PYR.h * (1 - dp / PYR.w));
+  // spine ridge runs across the east lane, so travelling in z launches you off it
+  if (x > SPINE.x0 && x < SPINE.x1 && z > SPINE.z0 && z < SPINE.z1)
+    h = Math.max(h, SPINE.h * (1 - Math.abs(z - (SPINE.z0 + SPINE.z1) / 2) / ((SPINE.z1 - SPINE.z0) / 2)));
+  h = Math.max(h, rollH(x, z));
+  h = Math.max(h, qpH(x, z));
+  h = Math.max(h, depotH(x, z));
+  // the streets are part of the map: plaza curb ring, then flat gutter+road,
+  // then the raised sidewalk running out to the building line
+  const mn = Math.max(Math.abs(x), Math.abs(z));
+  if (mn > 38.65 && mn < 39.55) h = Math.max(h, 0.28);
+  else if (mn > 49.15 && mn < 53.6) h = Math.max(h, 0.14);
+  if (bedsLive) {
+    for (const b of BEDS) {
+      if (x > b.x - b.hx && x < b.x + b.hx && z > b.z - b.hz && z < b.z + b.hz) h = Math.max(h, b.base + BED_H);
+    }
+  }
+  return h;
+}
+for (const b of BEDS) b.base = groundH(b.x, b.z);
+bedsLive = true;
+const COL_CONC = [0.46, 0.44, 0.5], COL_CONC_SIDE = [0.36, 0.33, 0.4];
+// kickers: sloped top, vertical drop face at the lip, triangle sides.
+// loZ is the foot of the ramp and hiZ the lip, so the pair can face each other.
+function kicker(loZ, hiZ, x0, x1, h) {
+  world.quad([x1, 0, loZ], [x0, 0, loZ], [x0, h, hiZ], [x1, h, hiZ], jit(COL_CONC, 0.06));
+  const xc = (x0 + x1) / 2;
+  world.quad([xc + 0.35, 0.035, loZ], [xc - 0.35, 0.035, loZ], [xc - 0.35, h + 0.035, hiZ], [xc + 0.35, h + 0.035, hiZ], COL_PAINT);
+  world.quad([x0, 0, hiZ], [x1, 0, hiZ], [x1, h, hiZ], [x0, h, hiZ], COL_CONC_SIDE);   // drop face at the lip
+  for (const x of [x0, x1]) world.tri([x, 0, loZ], [x, 0, hiZ], [x, h, hiZ], COL_CONC_SIDE);
+  const e = (hiZ > loZ ? -0.25 : 0.25), f = 0.25 / Math.abs(hiZ - loZ);
+  world.quad([x0, h * (1 - f) + 0.02, hiZ + e], [x1, h * (1 - f) + 0.02, hiZ + e],
+             [x1, h + 0.02, hiZ], [x0, h + 0.02, hiZ], COL_YELLOW);
+}
+kicker(KICK.az0, KICK.az1, KICK.x0, KICK.x1, KICK.h);
+kicker(KICK.bz1, KICK.bz0, KICK.x0, KICK.x1, KICK.h);
+// north bank: striped face so the slope reads at speed
+for (let sx = BANK.x0; sx < BANK.x1; sx += 5) {
+  const sb = Math.min(sx + 5, BANK.x1);
+  const shade = ((sx / 5) | 0) % 2 === 0 ? COL_CONC : [0.41, 0.39, 0.45];
+  world.quad([sb, 0, BANK.z0], [sx, 0, BANK.z0], [sx, BANK.h, BANK.z1], [sb, BANK.h, BANK.z1], jit(shade, 0.05));
+}
+for (const px of [-10, 10]) {
+  world.quad([px + 0.4, 0.04, BANK.z0], [px - 0.4, 0.04, BANK.z0], [px - 0.4, BANK.h + 0.04, BANK.z1], [px + 0.4, BANK.h + 0.04, BANK.z1], COL_PAINT);
+}
+world.tri([BANK.x0, 0, BANK.z0], [BANK.x0, 0, BANK.z1], [BANK.x0, BANK.h, BANK.z1], COL_CONC_SIDE);
+world.tri([BANK.x1, 0, BANK.z0], [BANK.x1, BANK.h, BANK.z1], [BANK.x1, 0, BANK.z1], COL_CONC_SIDE);
+world.quad([BANK.x1, 0.02, BANK.z0 + 0.4], [BANK.x0, 0.02, BANK.z0 + 0.4], [BANK.x0, 0.13, BANK.z0 + 0.68], [BANK.x1, 0.13, BANK.z0 + 0.68], COL_YELLOW);
+// closed back: the bank is a solid wedge, not an open shell you can see inside
+world.quad([BANK.x0, 0, BANK.z1], [BANK.x1, 0, BANK.z1], [BANK.x1, BANK.h, BANK.z1], [BANK.x0, BANK.h, BANK.z1], [0.3, 0.28, 0.35]);
+world.bar([BANK.x0, BANK.h + 0.03, BANK.z1 - 0.02], [BANK.x1, BANK.h + 0.03, BANK.z1 - 0.02], 0.07, [0.62, 0.65, 0.72]);
+// funbox: flat top + four planar skirts (mitred corners match the height field)
+{
+  const ix0 = FUN.cx - FUN.ax, ix1 = FUN.cx + FUN.ax, iz0 = FUN.cz - FUN.az, iz1 = FUN.cz + FUN.az;
+  const ox0 = ix0 - FUN.w, ox1 = ix1 + FUN.w, oz0 = iz0 - FUN.w, oz1 = iz1 + FUN.w, h = FUN.h;
+  world.quad([ix0, h, iz0], [ix0, h, iz1], [ix1, h, iz1], [ix1, h, iz0], jit(COL_CONC, 0.06));
+  world.quad([ox1, 0, oz1], [ox0, 0, oz1], [ix0, h, iz1], [ix1, h, iz1], COL_CONC_SIDE);   // +z skirt
+  world.quad([ox0, 0, oz0], [ox1, 0, oz0], [ix1, h, iz0], [ix0, h, iz0], COL_CONC_SIDE);   // -z skirt
+  world.quad([ox1, 0, oz0], [ox1, 0, oz1], [ix1, h, iz1], [ix1, h, iz0], COL_CONC_SIDE);   // +x skirt
+  world.quad([ox0, 0, oz1], [ox0, 0, oz0], [ix0, h, iz0], [ix0, h, iz1], COL_CONC_SIDE);   // -x skirt
+  world.quad([ix0, h + 0.02, iz0], [ix0, h + 0.02, iz1], [ix0 + 0.25, h + 0.02, iz1], [ix0 + 0.25, h + 0.02, iz0], COL_YELLOW);
+  world.quad([ix1 - 0.25, h + 0.02, iz0], [ix1 - 0.25, h + 0.02, iz1], [ix1, h + 0.02, iz1], [ix1, h + 0.02, iz0], COL_YELLOW);
+}
+// ---- south terrace: raised deck with a broad stair set down the north face ----
+{
+  const t = TERR, steps = 5, sd = t.ramp / steps;
+  world.quad([t.x0, t.h, t.z0], [t.x0, t.h, t.z1], [t.x1, t.h, t.z1], [t.x1, t.h, t.z0], jit(COL_CONC, 0.05));
+  world.groundQuad(t.x0, t.z1 - 0.35, t.x1, t.z1, t.h + 0.02, COL_YELLOW);
+  // west bank up onto the deck, so the south run rides straight through instead
+  // of dead-ending on a wall
+  world.quad([t.bx, 0, t.z0], [t.bx, 0, t.z1], [t.x0, t.h, t.z1], [t.x0, t.h, t.z0], jit(COL_CONC, 0.06));
+  world.quad([t.bx + 0.35, 0.035, t.z0], [t.bx + 0.35, 0.035, t.z1], [t.x0, t.h + 0.035, t.z1], [t.x0, t.h + 0.035, t.z0], COL_PAINT);
+  for (const z of [t.z0, t.z1]) world.tri([t.bx, 0, z], [t.x0, 0, z], [t.x0, t.h, z], COL_CONC_SIDE);
+  world.quad([t.x1, 0, t.z0], [t.x1, t.h, t.z0], [t.x1, t.h, t.z1], [t.x1, 0, t.z1], COL_CONC_SIDE);
+  world.tri([t.x1, 0, t.z1], [t.x1, t.h, t.z1], [t.x1, 0, t.z1 + t.ramp], COL_CONC_SIDE);
+  world.tri([t.x0, 0, t.z1], [t.x0, 0, t.z1 + t.ramp], [t.x0, t.h, t.z1], COL_CONC_SIDE);
+  world.quad([t.bx, 0, t.z0], [t.bx, t.h, t.z0], [t.x1, t.h, t.z0], [t.x1, 0, t.z0], [0.3, 0.28, 0.35]);  // south back wall
+  // stairs are drawn as treads/risers straddling the (smooth) collision ramp
+  let prevY = t.h;
+  for (let i = 0; i < steps; i++) {
+    const zA = t.z1 + i * sd, zB = zA + sd;
+    const ty = t.h * (1 - (i + 0.5) / steps);
+    world.quad([t.x1, prevY, zA], [t.x0, prevY, zA], [t.x0, ty, zA], [t.x1, ty, zA], jit(COL_CONC_SIDE, 0.05));
+    world.groundQuad(t.x0, zA, t.x1, zB, ty, jit(COL_CONC, 0.05));
+    prevY = ty;
+  }
+  world.quad([t.x1, prevY, t.z1 + t.ramp], [t.x0, prevY, t.z1 + t.ramp], [t.x0, 0, t.z1 + t.ramp], [t.x1, 0, t.z1 + t.ramp], COL_CONC_SIDE);
+}
+// ---- SE pyramid funbox ----
+{
+  const p = PYR, b = p.t + p.w;
+  const ix0 = p.cx - p.t, ix1 = p.cx + p.t, iz0 = p.cz - p.t, iz1 = p.cz + p.t;
+  const ox0 = p.cx - b, ox1 = p.cx + b, oz0 = p.cz - b, oz1 = p.cz + b;
+  world.quad([ix0, p.h, iz0], [ix0, p.h, iz1], [ix1, p.h, iz1], [ix1, p.h, iz0], jit(COL_CONC, 0.06));
+  world.quad([ox1, 0, oz1], [ox0, 0, oz1], [ix0, p.h, iz1], [ix1, p.h, iz1], jit(COL_CONC_SIDE, 0.07));
+  world.quad([ox0, 0, oz0], [ox1, 0, oz0], [ix1, p.h, iz0], [ix0, p.h, iz0], jit(COL_CONC_SIDE, 0.07));
+  world.quad([ox1, 0, oz0], [ox1, 0, oz1], [ix1, p.h, iz1], [ix1, p.h, iz0], jit(COL_CONC_SIDE, 0.07));
+  world.quad([ox0, 0, oz1], [ox0, 0, oz0], [ix0, p.h, iz0], [ix0, p.h, iz1], jit(COL_CONC_SIDE, 0.07));
+  world.quad([ix0, p.h + 0.02, iz0], [ix0, p.h + 0.02, iz1], [ix0 + 0.22, p.h + 0.02, iz1], [ix0 + 0.22, p.h + 0.02, iz0], COL_YELLOW);
+  world.quad([ix1 - 0.22, p.h + 0.02, iz0], [ix1 - 0.22, p.h + 0.02, iz1], [ix1, p.h + 0.02, iz1], [ix1, p.h + 0.02, iz0], COL_YELLOW);
+  world.quad([ix0, p.h + 0.02, iz0], [ix0, p.h + 0.02, iz0 + 0.22], [ix1, p.h + 0.02, iz0 + 0.22], [ix1, p.h + 0.02, iz0], COL_YELLOW);
+  world.quad([ix0, p.h + 0.02, iz1 - 0.22], [ix0, p.h + 0.02, iz1], [ix1, p.h + 0.02, iz1], [ix1, p.h + 0.02, iz1 - 0.22], COL_YELLOW);
+  // painted runner up each face so the slopes read from ground level —
+  // over-bright paint so it survives the shaded (north/west) faces
+  const RUN = [1.15, 1.1, 1.0];
+  world.quad([p.cx - 0.35, 0.03, oz0], [p.cx + 0.35, 0.03, oz0], [p.cx + 0.35, p.h + 0.03, iz0], [p.cx - 0.35, p.h + 0.03, iz0], RUN);
+  world.quad([p.cx + 0.35, 0.03, oz1], [p.cx - 0.35, 0.03, oz1], [p.cx - 0.35, p.h + 0.03, iz1], [p.cx + 0.35, p.h + 0.03, iz1], RUN);
+  world.quad([ox0, 0.03, p.cz + 0.35], [ox0, 0.03, p.cz - 0.35], [ix0, p.h + 0.03, p.cz - 0.35], [ix0, p.h + 0.03, p.cz + 0.35], RUN);
+  world.quad([ox1, 0.03, p.cz - 0.35], [ox1, 0.03, p.cz + 0.35], [ix1, p.h + 0.03, p.cz + 0.35], [ix1, p.h + 0.03, p.cz - 0.35], RUN);
+}
+// ---- NE spine: back-to-back launch ramps, ridge running across the east lane ----
+{
+  const s = SPINE, mz = (s.z0 + s.z1) / 2, xc = (s.x0 + s.x1) / 2;
+  world.quad([s.x1, 0, s.z0], [s.x0, 0, s.z0], [s.x0, s.h, mz], [s.x1, s.h, mz], jit(COL_CONC, 0.06));
+  world.quad([s.x1, s.h, mz], [s.x0, s.h, mz], [s.x0, 0, s.z1], [s.x1, 0, s.z1], jit(COL_CONC, 0.06));
+  world.quad([xc + 0.35, 0.035, s.z0], [xc - 0.35, 0.035, s.z0], [xc - 0.35, s.h + 0.035, mz], [xc + 0.35, s.h + 0.035, mz], COL_PAINT);
+  world.quad([xc + 0.35, s.h + 0.035, mz], [xc - 0.35, s.h + 0.035, mz], [xc - 0.35, 0.035, s.z1], [xc + 0.35, 0.035, s.z1], COL_PAINT);
+  for (const x of [s.x0, s.x1]) world.tri([x, 0, s.z0], [x, s.h, mz], [x, 0, s.z1], COL_CONC_SIDE);
+  // yellow lip along the apex so the spine reads from any approach
+  const ay = s.h * (1 - 0.35 / 3.5);
+  world.quad([s.x0, ay + 0.03, mz - 0.35], [s.x1, ay + 0.03, mz - 0.35], [s.x1, s.h + 0.03, mz], [s.x0, s.h + 0.03, mz], COL_YELLOW);
+  world.quad([s.x0, s.h + 0.03, mz], [s.x1, s.h + 0.03, mz], [s.x1, ay + 0.03, mz + 0.35], [s.x0, ay + 0.03, mz + 0.35], COL_YELLOW);
+}
+// ---- boulevard rhythm rollers: pump them in a manual on the way up the line ----
+{
+  const shadeA = [0.42, 0.4, 0.48], shadeB = [0.36, 0.34, 0.43];
+  const xs = [ROLL.x0, ROLL.x0 + 1.2, ROLL.x1 - 1.2, ROLL.x1];
+  const nz = 24, dzr = (ROLL.z1 - ROLL.z0) / nz;
+  for (let i = 0; i < nz; i++) {
+    const zA = ROLL.z0 + i * dzr, zB = zA + dzr;
+    const col = jit((((i * ROLL.n * 2 / nz) | 0) % 2) ? shadeB : shadeA, 0.05);
+    for (let j = 0; j < 3; j++) {
+      world.quad(
+        [xs[j], rollH(xs[j], zA) + 0.013, zA], [xs[j], rollH(xs[j], zB) + 0.013, zB],
+        [xs[j + 1], rollH(xs[j + 1], zB) + 0.013, zB], [xs[j + 1], rollH(xs[j + 1], zA) + 0.013, zA], col);
+    }
+  }
+  for (let i = 0; i < ROLL.n; i++) {
+    const cz2 = ROLL.z0 + (i + 0.5) / ROLL.n * (ROLL.z1 - ROLL.z0);
+    world.quad([ROLL.x0 + 1.2, ROLL.h + 0.03, cz2 - 0.2], [ROLL.x0 + 1.2, ROLL.h + 0.03, cz2 + 0.2],
+               [ROLL.x1 - 1.2, ROLL.h + 0.03, cz2 + 0.2], [ROLL.x1 - 1.2, ROLL.h + 0.03, cz2 - 0.2], COL_YELLOW);
+  }
+}
+// ---- quarter pipes: curved transitions built in smooth-shaded strips ----
+const COL_COPING = [0.62, 0.65, 0.72];
+// profile strip helper: at(d, h) -> the two endpoints of the cross-line at
+// distance d up the transition; nrm(d) -> the true surface normal there, so
+// the hemisphere light grades the curve and it reads round even in shadow
+function qpFace(q, at, N, colA, colB, nrm) {
+  for (let i = 0; i < N; i++) {
+    const dA = i / N * q.w, dB = (i + 1) / N * q.w;
+    const hA = qpProf(dA, q) + 0.012, hB = qpProf(dB, q) + 0.012;
+    const [a0, a1] = at(dA, hA), [b0, b1] = at(dB, hB);
+    const col = jit(((i % 2) ? colB : colA), 0.05);
+    const nA = nrm(dA), nB = nrm(dB);
+    world.raw(a0, a1, b1, nA, nA, nB, col);
+    world.raw(a0, b1, b0, nA, nB, nB, col);
+  }
+}
+{
+  // east quarter pipe: faces the plaza (-x), deck drops into the street behind
+  const q = EQP, xw = q.x0 + q.w, xd = q.x0 + q.w + q.deck, NS = 8;
+  const shadeA = COL_CONC, shadeB = [0.41, 0.39, 0.45];
+  const qn = d => { const s = Math.min(d / q.r, 0.999); return [-s, Math.sqrt(1 - s * s), 0]; };
+  for (let zi = q.z0; zi < q.z1 - 0.01; zi += 4.25) {
+    const zb = Math.min(zi + 4.25, q.z1);
+    const flip = (((zi - q.z0) / 4.25) | 0) % 2;
+    qpFace(q, (d, h) => [[q.x0 + d, h, zi], [q.x0 + d, h, zb]], NS, flip ? shadeB : shadeA, flip ? shadeA : shadeB, qn);
+  }
+  // painted runner up the middle so the curve reads at speed
+  const zc = (q.z0 + q.z1) / 2;
+  qpFace(q, (d, h) => [[q.x0 + d, h + 0.012, zc - 0.35], [q.x0 + d, h + 0.012, zc + 0.35]], NS, COL_PAINT, COL_PAINT, qn);
+  world.groundQuad(xw, q.z0, xd, q.z1, q.top + 0.012, jit(COL_CONC, 0.05));          // deck
+  world.groundQuad(xw, q.z0, xw + 0.3, q.z1, q.top + 0.025, COL_YELLOW);             // lip stripe
+  world.bar([xw, q.top + 0.05, q.z0], [xw, q.top + 0.05, q.z1], 0.055, COL_COPING);  // coping
+  world.quad([xd, 0, q.z0], [xd, 0, q.z1], [xd, q.top, q.z1], [xd, q.top, q.z0], COL_CONC_SIDE);  // back face
+  for (const z of [q.z0, q.z1]) {   // side walls under the curve + deck
+    for (let i = 0; i < NS; i++) {
+      const dA = i / NS * q.w, dB = (i + 1) / NS * q.w;
+      world.quad([q.x0 + dA, 0, z], [q.x0 + dB, 0, z], [q.x0 + dB, qpProf(dB, q), z], [q.x0 + dA, qpProf(dA, q), z], COL_CONC_SIDE);
+    }
+    world.quad([xw, 0, z], [xd, 0, z], [xd, q.top, z], [xw, q.top, z], COL_CONC_SIDE);
+  }
+}
+{
+  // NW halfpipe: two facing transitions with decks, open at both ends.
+  // side = the direction OUT of the flat bottom (-1 south wall, +1 north wall)
+  const q = HPIPE, shadeA = [0.44, 0.42, 0.49], shadeB = [0.385, 0.365, 0.435], NS = 8;
+  for (const side of [-1, 1]) {
+    const ze = side < 0 ? q.zA : q.zB;                    // flat-bottom edge
+    const zl = ze + side * q.w, zdk = zl + side * q.deck; // lip line, deck back edge
+    const qn = d => { const s = Math.min(d / q.r, 0.999); return [0, Math.sqrt(1 - s * s), -side * s]; };
+    for (let xi = q.x0; xi < q.x1 - 0.01; xi += 3.5) {
+      const xb = Math.min(xi + 3.5, q.x1);
+      const flip = (((xi - q.x0) / 3.5) | 0) % 2;
+      qpFace(q, (d, h) => {
+        const zz = ze + side * d;
+        return [[xi, h, zz], [xb, h, zz]];
+      }, NS, flip ? shadeB : shadeA, flip ? shadeA : shadeB, qn);
+    }
+    // runner stripe + deck + coping + lip paint
+    const xc = (q.x0 + q.x1) / 2;
+    qpFace(q, (d, h) => {
+      const zz = ze + side * d;
+      return [[xc - 0.35, h + 0.012, zz], [xc + 0.35, h + 0.012, zz]];
+    }, NS, COL_PAINT, COL_PAINT, qn);
+    world.groundQuad(q.x0, Math.min(zl, zdk), q.x1, Math.max(zl, zdk), q.top + 0.012, jit(COL_CONC, 0.05));
+    world.groundQuad(q.x0, Math.min(zl, zl + side * 0.3), q.x1, Math.max(zl, zl + side * 0.3), q.top + 0.025, COL_YELLOW);
+    world.bar([q.x0, q.top + 0.05, zl], [q.x1, q.top + 0.05, zl], 0.055, COL_COPING);
+    world.quad([q.x0, 0, zdk], [q.x1, 0, zdk], [q.x1, q.top, zdk], [q.x0, q.top, zdk], [0.3, 0.28, 0.35]);  // deck back face
+    for (const x of [q.x0, q.x1]) {   // open ends: wall under transition + deck
+      for (let i = 0; i < NS; i++) {
+        const dA = i / NS * q.w, dB = (i + 1) / NS * q.w;
+        const zA2 = ze + side * dA, zB2 = ze + side * dB;
+        world.quad([x, 0, zA2], [x, 0, zB2], [x, qpProf(dB, q), zB2], [x, qpProf(dA, q), zA2], COL_CONC_SIDE);
+      }
+      world.quad([x, 0, zl], [x, 0, zdk], [x, q.top, zdk], [x, q.top, zl], COL_CONC_SIDE);
+    }
+    // roll-in bank feeding this deck — arrive at speed, drop straight in
+    const zr = zdk + side * ROLLIN;
+    world.quad([q.x0, 0, zr], [q.x1, 0, zr], [q.x1, q.top, zdk], [q.x0, q.top, zdk], jit(COL_CONC, 0.06));
+    const xm = (q.x0 + q.x1) / 2;
+    world.quad([xm - 0.35, 0.035, zr], [xm + 0.35, 0.035, zr], [xm + 0.35, q.top + 0.035, zdk], [xm - 0.35, q.top + 0.035, zdk], COL_PAINT);
+    for (const x of [q.x0, q.x1]) world.tri([x, 0, zr], [x, 0, zdk], [x, q.top, zdk], COL_CONC_SIDE);
+  }
+}
+// ---- the depot: the low building across the north street. Gap the kiosk off the
+// bank, land on the roof, gap the alley, ride an end ramp back down to the road.
+// kept off the z≈47 line so the run across the roof — land, gap the alley, take an
+// end ramp back down — stays clean
+const ROOF_AC = [[-14, 49.8], [-8.5, 50.2], [15, 50.2], [3.5, 50.5]];
+{
+  const d = DEPOT, WALL = [0.42, 0.36, 0.34], WALL_D = [0.33, 0.28, 0.27], ROOF = [0.4, 0.39, 0.44];
+  // two roof slabs with the alley between them
+  for (const p of [[d.x0, d.ax0], [d.ax1, d.x1]]) {
+    world.groundQuad(p[0], d.z0, p[1], d.z1, d.h, jit(ROOF, 0.05));
+    world.groundQuad(p[0], d.z0, p[1], d.z0 + 0.3, d.h + 0.02, COL_YELLOW);         // edge stripe you aim at
+    world.groundQuad(p[0], d.z1 - 0.3, p[1], d.z1, d.h + 0.02, COL_YELLOW);
+    // alley walls / street faces
+    for (const zz of [d.z0, d.z1]) world.quad([p[0], 0, zz], [p[1], 0, zz], [p[1], d.h, zz], [p[0], d.h, zz], jit(zz === d.z0 ? WALL : WALL_D, 0.04));
+  }
+  for (const ax of [d.ax0, d.ax1]) world.quad([ax, 0, d.z0], [ax, 0, d.z1], [ax, d.h, d.z1], [ax, d.h, d.z0], WALL_D);
+  world.groundQuad(d.ax0, d.z0, d.ax1, d.z1, 0.02, [0.2, 0.19, 0.22]);              // alley floor
+  for (const ax of [d.ax0 - 0.3, d.ax1]) world.groundQuad(ax, d.z0, ax + 0.3, d.z1, d.h + 0.02, COL_YELLOW);
+  // banked end ramps down to the road
+  for (const s of [-1, 1]) {
+    const xe = s < 0 ? d.x0 : d.x1, xr = xe + s * d.ramp;
+    world.quad([xr, 0, d.z1], [xr, 0, d.z0], [xe, d.h, d.z0], [xe, d.h, d.z1], jit(COL_CONC, 0.06));
+    const zm = (d.z0 + d.z1) / 2;
+    world.quad([xr, 0.035, zm + 0.35], [xr, 0.035, zm - 0.35], [xe, d.h + 0.035, zm - 0.35], [xe, d.h + 0.035, zm + 0.35], COL_PAINT);
+    for (const zz of [d.z0, d.z1]) world.tri([xr, 0, zz], [xe, 0, zz], [xe, d.h, zz], COL_CONC_SIDE);
+  }
+  // roof furniture, so it reads as a rooftop and not a grey slab
+  for (const p of ROOF_AC) {
+    world.box(p[0], d.h + 0.42, p[1], 1.5, 0.84, 1.2, [0.6, 0.6, 0.64]);
+    world.box(p[0], d.h + 0.88, p[1], 1.2, 0.1, 0.95, [0.5, 0.5, 0.55]);
+  }
+  world.box(-6, d.h + 1.6, 47, 0.16, 3.2, 0.16, [0.3, 0.28, 0.33]);
+  world.bar([-6, d.h + 3.2, 47], [-4.6, d.h + 2.5, 47.9], 0.05, [0.35, 0.33, 0.38]);
+  // painted DEPOT band across the street face
+  world.quad([-9, 1.5, d.z0 - 0.06], [9, 1.5, d.z0 - 0.06], [9, 2.3, d.z0 - 0.06], [-9, 2.3, d.z0 - 0.06], [0.86, 0.3, 0.24]);
+}
+// ---- the kiosk: sits in the road under the arc, so the line reads as over one
+// building and onto another ----
+{
+  const kx = 0, kz = 41;
+  world.box(kx, 1.0, kz, 3.2, 2.0, 1.8, [0.72, 0.66, 0.5]);
+  world.box(kx, 2.12, kz, 3.7, 0.24, 2.3, [0.8, 0.3, 0.26]);
+  world.box(kx, 1.35, kz - 0.92, 2.4, 1.0, 0.06, [0.35, 0.5, 0.55]);
+  world.box(kx, 0.42, kz - 0.98, 2.6, 0.1, 0.3, [0.5, 0.44, 0.34]);
+  world.bar([kx, 2.26, kz], [kx, 3.0, kz], 0.05, [0.4, 0.38, 0.42]);
+  world.box(kx, 3.25, kz, 1.5, 0.5, 0.1, [0.95, 0.8, 0.3]);
+}
+// ---- parked cars (along z by default, along = 'x' for east-west streets) ----
+// lofted sedan: nose → hood → windshield → roof → rear window → trunk → tail,
+// with a real glass band, so it reads curved instead of two stacked boxes
+function mkCar(cx, cz, col, along) {
+  const T = along === 'x' ? (p => [cx + p[2], p[1], cz - p[0]]) : (p => [cx + p[0], p[1], cz + p[2]]);
+  const ry = along === 'x' ? Math.PI / 2 : 0;
+  const GLASS = [0.1, 0.13, 0.2];
+  const roofC = [col[0] * 1.08, col[1] * 1.08, col[2] * 1.08];
+  // cross-sections nose→tail: [z, yBot, wBot, hBelt, wBelt, hRoof, wRoof]
+  const SEC = [
+    [ 1.80, 0.18, 0.58, 0.56, 0.64, 0.58, 0.50],
+    [ 1.02, 0.16, 0.70, 0.74, 0.78, 0.76, 0.70],
+    [ 0.35, 0.16, 0.70, 0.75, 0.78, 1.16, 0.56],
+    [-0.82, 0.16, 0.70, 0.76, 0.78, 1.16, 0.56],
+    [-1.38, 0.16, 0.70, 0.76, 0.78, 0.78, 0.70],
+    [-1.80, 0.18, 0.58, 0.62, 0.62, 0.64, 0.52]
+  ];
+  const ring = r => [
+    [-r[2], r[1], r[0]], [-r[4], r[3], r[0]], [-r[6], r[5], r[0]],
+    [ r[6], r[5], r[0]], [ r[4], r[3], r[0]], [ r[2], r[1], r[0]]
+  ];
+  const q = (a, b, c, d, cc) => world.quad(T(a), T(b), T(c), T(d), cc);
+  for (let i = 0; i < SEC.length - 1; i++) {
+    const A2 = ring(SEC[i]), B2 = ring(SEC[i + 1]);
+    for (let j = 0; j < 6; j++) {
+      const j2 = (j + 1) % 6;
+      let cc = jit(col, 0.06);
+      if (j === 5) cc = [0.1, 0.1, 0.13];                                    // underbody
+      else if ((j === 1 || j === 3) && i >= 1 && i <= 3) cc = GLASS;         // side windows
+      else if (j === 2) cc = (i === 1 || i === 3) ? GLASS : (i === 2 ? roofC : jit(col, 0.06));
+      q(A2[j], A2[j2], B2[j2], B2[j], cc);
+    }
+  }
+  const F = ring(SEC[0]), K = ring(SEC[SEC.length - 1]);
+  q(F[0], F[5], F[4], F[1], jit(col, 0.06)); q(F[1], F[4], F[3], F[2], jit(col, 0.06));
+  q(K[1], K[4], K[5], K[0], jit(col, 0.06)); q(K[2], K[3], K[4], K[1], jit(col, 0.06));
+  for (const e of [[0, 0.3, 1.86], [0, 0.3, -1.86]]) {
+    const t = T(e);
+    world.box(t[0], t[1], t[2], 1.34, 0.18, 0.16, [0.55, 0.55, 0.6], ry);
+  }
+  for (const sw of [-0.4, 0.4]) {
+    const hf = T([sw, 0.52, 1.82]), hr = T([sw, 0.56, -1.82]);
+    world.box(hf[0], hf[1], hf[2], 0.3, 0.12, 0.07, [1.0, 0.85, 0.5], ry);
+    world.box(hr[0], hr[1], hr[2], 0.3, 0.12, 0.07, [0.9, 0.2, 0.25], ry);
+  }
+  for (const dz of [-1.15, 1.15]) for (const sw of [-1, 1]) {
+    const c2 = T([sw * 0.74, 0.29, dz]);
+    if (along === 'x') world.cylZ(c2[0], c2[1], c2[2], 0.29, 0.18, 12, [0.1, 0.1, 0.13]);
+    else world.cylX(c2[0], c2[1], c2[2], 0.29, 0.18, 12, [0.1, 0.1, 0.13]);
+  }
+}
+mkCar(47.2, 32, [0.12, 0.55, 0.58]);   // moved to the street — the east QP took their spot
+mkCar(-47.2, -34, [0.82, 0.24, 0.5]);
+mkCar(-33.8, 20, [0.5, 0.32, 0.72]);
+// ---- ENDO! neon sign, up on the depot roof ----
+// It used to hang over the north bank, which put a wall of neon exactly where you
+// need to see the roof you're jumping at. Up here it does the opposite job: it's
+// the only thing tall enough to clear the bank from the hub, so it reads as the
+// target from the far end of the boulevard.
+{
+  const FONT = { E: ['111','100','111','100','111'], N: ['1001','1101','1011','1001','1001'],
+                 D: ['1110','1001','1001','1001','1110'], O: ['0110','1001','1001','1001','0110'], '!': ['1','1','1','0','1'] };
+  const colors = { E: [1.0, 0.35, 0.55], N: [1.0, 0.82, 0.25], D: [0.35, 0.9, 1.0], O: [1.0, 0.35, 0.55], '!': [1.0, 0.82, 0.25] };
+  const word = 'ENDO!', cell = 0.62, SZ = 50.4, BASE = DEPOT.h;
+  let wCells = -1; for (const ch of word) wCells += FONT[ch][0].length + 1;
+  const totW = wCells * cell;
+  const midY = BASE + 3.55;
+  world.box(0, midY, SZ, totW + 1.4, cell * 5.6, 0.16, [0.1, 0.06, 0.18]);
+  for (const s of [-1, 1]) world.box(s * (totW / 2 + 0.35), BASE + 1.8, SZ + 0.05, 0.26, 3.6, 0.26, [0.2, 0.18, 0.26]);
+  // facing +z-looking viewers, screen-right is -x — lay glyphs right-to-left
+  let gx = totW / 2;
+  const topY = midY + cell * 2.3;
+  for (const ch of word) {
+    const g = FONT[ch];
+    for (let r = 0; r < 5; r++) for (let c = 0; c < g[r].length; c++) {
+      if (g[r][c] === '1') world.box(gx - (c + 0.5) * cell, topY - r * cell, SZ - 0.14, cell * 0.92, cell * 0.92, 0.16, colors[ch]);
+    }
+    gx -= (g[0].length + 1) * cell;
+  }
+}
+// ---- the paint pass: this is what turns four sets of obstacles into four runs.
+// Every lane gets kerb lines down its edges and chevrons pointing the way, laid
+// on the height field so they climb the ramps with it. You can see a whole run
+// from the far end of it before you've ridden a metre of it.
+const COL_LANE = [0.72, 0.7, 0.66], COL_ARROW = [0.9, 0.74, 0.22];
+function paintStrip(x, z, len, w, along, col, lift) {
+  // a painted patch that follows the terrain, split so it doesn't float over ramps
+  const n = Math.max(1, Math.ceil(len / 1.2)), d = len / n;
+  for (let i = 0; i < n; i++) {
+    const a = (along === 'z' ? z : x) + i * d, b = a + d;
+    const p = t => along === 'z' ? [x, groundH(x, t) + (lift || 0.016), t] : [t, groundH(t, z) + (lift || 0.016), z];
+    const q = t => along === 'z' ? [x + w, groundH(x + w, t) + (lift || 0.016), t] : [t, groundH(t, z + w) + (lift || 0.016), z + w];
+    world.quad(p(a), p(b), q(b), q(a), col);
+  }
+}
+// dashed edge lines down both sides of a lane
+function laneLines(c, half, from, to, along) {
+  for (const s of [-1, 1]) {
+    const e = c + s * half;
+    for (let t = from; t < to; t += 5.5) {
+      const len = Math.min(3.2, to - t);
+      if (along === 'z') paintStrip(e - 0.09, t, len, 0.18, 'z', COL_LANE);
+      else paintStrip(t, e - 0.09, len, 0.18, 'x', COL_LANE);
+    }
+  }
+}
+// a chevron pointing down the lane: two angled bars meeting at the tip
+function chevron(cx, cz, along, dir) {
+  const W = 1.5, L = 1.1, T = 0.34;
+  for (const s of [-1, 1]) {
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const u0 = i / n, u1 = (i + 1) / n;
+      const pt = u => along === 'z'
+        ? [cx + s * W * u, cz + dir * L * (1 - u)]
+        : [cx + dir * L * (1 - u), cz + s * W * u];
+      const a = pt(u0), b = pt(u1);
+      const ox = along === 'z' ? 0 : T, oz = along === 'z' ? T : 0;
+      world.quad([a[0], groundH(a[0], a[1]) + 0.018, a[1]], [b[0], groundH(b[0], b[1]) + 0.018, b[1]],
+                 [b[0] + ox, groundH(b[0], b[1]) + 0.018, b[1] + oz], [a[0] + ox, groundH(a[0], a[1]) + 0.018, a[1] + oz], COL_ARROW);
+    }
+  }
+}
+{
+  // L1 the boulevard — terrace stairs to the foot of the bank
+  laneLines(0, LANE_W, -29.5, 31, 'z');
+  for (let z = -26; z < 31; z += 7.5) if (z < -14 || z > 1) chevron(0, z, 'z', 1);
+  // L3 the east wall run — pyramid, spine, and the quarter pipe all the way up
+  laneLines(31, 2.8, -28, 30, 'z');
+  for (let z = -26; z < 30; z += 8) chevron(31, z, 'z', 1);
+  // L2 the west run — funbox, roll-in, halfpipe
+  laneLines(-24, 3.4, -20, 15, 'z');
+  for (let z = -18; z < 15; z += 8) chevron(-24, z, 'z', 1);
+  // L4 the south run — bank up, across the terrace deck, off the far side
+  laneLines(-34, 3.0, -21, 15, 'x');
+  for (let x = -18; x < 13; x += 8) chevron(x, -34, 'x', 1);
+  // the hub: a compass rose you can see every run leaving from
+  const HUB = [0, 9];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2, len = i % 2 ? 2.6 : 4.6, w = i % 2 ? 0.28 : 0.42;
+    const dx = Math.sin(a), dz = Math.cos(a), px = -dz * w, pz = dx * w;
+    const x0 = HUB[0] + dx * 1.5, z0 = HUB[1] + dz * 1.5, x1 = HUB[0] + dx * len, z1 = HUB[1] + dz * len;
+    world.quad([x0 - px, 0.017, z0 - pz], [x1 - px, 0.017, z1 - pz], [x1 + px, 0.017, z1 + pz], [x0 + px, 0.017, z0 + pz],
+               i % 2 ? COL_LANE : COL_ARROW);
+  }
+  for (let i = 0; i < 20; i++) {   // ring around the rose
+    const a0 = i / 20 * Math.PI * 2, a1 = (i + 1) / 20 * Math.PI * 2;
+    world.quad([HUB[0] + Math.sin(a0) * 5.2, 0.017, HUB[1] + Math.cos(a0) * 5.2],
+               [HUB[0] + Math.sin(a1) * 5.2, 0.017, HUB[1] + Math.cos(a1) * 5.2],
+               [HUB[0] + Math.sin(a1) * 5.5, 0.017, HUB[1] + Math.cos(a1) * 5.5],
+               [HUB[0] + Math.sin(a0) * 5.5, 0.017, HUB[1] + Math.cos(a0) * 5.5], COL_LANE);
+  }
+}
+// curb ring around the plaza (the fence is gone — hop the curb, the block is yours)
+const COL_CURB = [0.5, 0.46, 0.52];
+for (const s of [-1, 1]) {
+  world.box(0, 0.14, s * 39.1, 79.4, 0.28, 0.9, COL_CURB);
+  world.box(s * 39.1, 0.14, 0, 0.9, 0.28, 78, COL_CURB);
+}
+
+// ================================================================
+//  CITY STREETS — rideable: gutter, ring road, raised sidewalk.
+//  Furniture and parked cars out here are solid obstacles now.
+// ================================================================
+// Positions live here so the meshes and the `solids` list further down can't drift
+// apart. The north side has to clear the depot's footprint and its two end ramps —
+// anything parked in there ends up buried inside the building.
+const DEPOT_CLR = DEPOT.x1 + DEPOT.ramp + 1.5;                          // 25.0
+const LAMP_U = [-32, -11, 11, 32];
+const HYDRANTS = [[50.6, 20], [-50.6, -26], [36, 50.6], [-22, -50.6]];
+const TRASH = [[50.7, -8], [-38, 50.7], [28, -50.7], [-50.7, 12]];
+const BENCHES = [[-30, 50.9, 'x'], [26, 50.9, 'x'], [50.9, -16, 'z'], [-50.9, 30, 'z']];
+const SHELTER = [-33, 51.3];
+{
+  ring(world, 39.55, 41, 0, 2, walkCol);      // gutter apron behind the fence
+  ring(world, 41, 49, 0, 2, asphCol);         // ring road
+  ring(world, 49, 53.5, 0.14, 2, walkCol);    // raised sidewalk in front of the buildings
+  ring(world, 53.5, 82, 0, 4, lotCol);        // back lots fading into the haze
+  // lane dashes down the middle of the ring road (kept clear of corners + crosswalks)
+  const DASH = [0.7, 0.66, 0.55];
+  for (let u = -39; u <= 39; u += 6) {
+    if (Math.abs(u) < 6) continue;
+    for (const s of [-1, 1]) {
+      world.groundQuad(u - 1.1, s * 45 - 0.09, u + 1.1, s * 45 + 0.09, 0.012, DASH);
+      world.groundQuad(s * 45 - 0.09, u - 1.1, s * 45 + 0.09, u + 1.1, 0.012, DASH);
+    }
+  }
+  // zebra crosswalks at the mid-point of each side
+  const ZEB = [0.62, 0.6, 0.58];
+  for (const s of [-1, 1]) {
+    const r0 = Math.min(s * 41.6, s * 48.4), r1 = Math.max(s * 41.6, s * 48.4);
+    for (let i = -3; i <= 3; i++) {
+      world.groundQuad(i * 0.95 - 0.32, r0, i * 0.95 + 0.32, r1, 0.012, ZEB);
+      world.groundQuad(r0, i * 0.95 - 0.32, r1, i * 0.95 + 0.32, 0.012, ZEB);
+    }
+  }
+  // curb along the sidewalk edge
+  for (const s of [-1, 1]) {
+    world.box(0, 0.07, s * 49.15, 98.6, 0.14, 0.32, COL_CURB);
+    world.box(s * 49.15, 0.07, 0, 0.32, 0.14, 98.6, COL_CURB);
+  }
+  // street lamps arch over the road from the sidewalk
+  function streetLamp(x, z, dirx, dirz) {
+    const gy = groundH(x, z);
+    world.box(x, gy + 2.6, z, 0.16, 5.2, 0.16, [0.2, 0.18, 0.26]);
+    world.bar([x, gy + 5.15, z], [x + dirx * 2.4, gy + 5.4, z + dirz * 2.4], 0.055, [0.2, 0.18, 0.26]);
+    world.box(x + dirx * 2.4, gy + 5.34, z + dirz * 2.4, 0.55, 0.15, 0.55, [1.0, 0.88, 0.55]);
+  }
+  for (const u of LAMP_U) {
+    if (Math.abs(u) > DEPOT_CLR) streetLamp(u, 50, 0, -1);   // the depot ate the middle of the north walk
+    streetLamp(u, -50, 0, 1);
+    streetLamp(50, u, -1, 0); streetLamp(-50, u, 1, 0);
+  }
+  // hydrants, trash cans, benches
+  function hydrant(x, z) {
+    const gy = groundH(x, z);
+    world.cylY(x, gy, z, 0.15, 0.5, 8, [0.72, 0.18, 0.18], null);
+    world.cone(x, gy + 0.5, z, 0.16, 0.2, 8, [0.78, 0.22, 0.2]);
+    world.box(x, gy + 0.38, z, 0.44, 0.1, 0.12, [0.62, 0.15, 0.16]);
+  }
+  for (const p of HYDRANTS) hydrant(p[0], p[1]);
+  function trashCan(x, z) {
+    world.cylY(x, groundH(x, z), z, 0.26, 0.72, 8, [0.2, 0.3, 0.22], [0.16, 0.24, 0.18]);
+  }
+  for (const p of TRASH) trashCan(p[0], p[1]);
+  function bench(x, z, ry) {
+    const bs = Math.sin(ry), bc = Math.cos(ry), wood = [0.42, 0.28, 0.2], gy = groundH(x, z);
+    world.box(x, gy + 0.42, z, 1.8, 0.08, 0.5, wood, ry);
+    world.box(x - bs * 0.22, gy + 0.72, z - bc * 0.22, 1.8, 0.5, 0.08, wood, ry);
+    for (const e of [-0.75, 0.75]) {
+      world.box(x + bc * e, gy + 0.2, z - bs * e, 0.1, 0.4, 0.44, [0.16, 0.15, 0.2], ry);
+    }
+  }
+  for (const p of BENCHES) bench(p[0], p[1], p[2] === 'x' ? Math.PI : (p[0] > 0 ? -Math.PI / 2 : Math.PI / 2));
+  // traffic lights at two corners
+  function trafficLight(x, z, ry) {
+    const hx = Math.sin(ry), hz = Math.cos(ry), gy = groundH(x, z);
+    world.box(x, gy + 2.3, z, 0.15, 4.6, 0.15, [0.16, 0.15, 0.2]);
+    world.bar([x, gy + 4.5, z], [x + hx * 2.0, gy + 4.62, z + hz * 2.0], 0.05, [0.16, 0.15, 0.2]);
+    const bx = x + hx * 2.0, bz = z + hz * 2.0;
+    world.box(bx, gy + 4.18, bz, 0.26, 0.85, 0.26, [0.1, 0.1, 0.14]);
+    world.box(bx, gy + 4.44, bz, 0.28, 0.16, 0.28, [0.85, 0.22, 0.16]);
+    world.box(bx, gy + 4.2, bz, 0.28, 0.16, 0.28, [0.9, 0.66, 0.2]);
+    world.box(bx, gy + 3.96, bz, 0.28, 0.16, 0.28, [0.22, 0.75, 0.34]);
+  }
+  trafficLight(49.6, 49.6, -3 * Math.PI / 4);
+  trafficLight(-49.6, -49.6, Math.PI / 4);
+  // curbside parking on the ring road
+  mkCar(47.2, -20, [0.72, 0.3, 0.2]); mkCar(47.2, 8, [0.24, 0.32, 0.6]);
+  mkCar(-47.2, -4, [0.65, 0.6, 0.24]); mkCar(-47.2, 26, [0.3, 0.55, 0.42]);
+  mkCar(40, 47.2, [0.55, 0.26, 0.52], 'x'); mkCar(-40, 47.2, [0.26, 0.5, 0.58], 'x');
+  mkCar(-4, -47.2, [0.6, 0.42, 0.24], 'x'); mkCar(22, -47.2, [0.35, 0.35, 0.42], 'x');
+}
+// fountain — moved out of the plaza centre into the SW garden. Dead centre it
+// plugged every run through the hub; out here it's a landmark you carve around.
+const FTN = [-14, -14];
+world.cylY(FTN[0], 0, FTN[1], 3.3, 0.85, 16, [0.45, 0.4, 0.5], [0.5, 0.45, 0.55]);
+world.cylY(FTN[0], 0.85, FTN[1], 2.85, 0.06, 16, [0.2, 0.45, 0.75], [0.25, 0.55, 0.85]);
+world.cylY(FTN[0], 0.85, FTN[1], 0.55, 1.9, 12, [0.45, 0.4, 0.5], [0.5, 0.45, 0.55]);
+world.cone(FTN[0], 2.75, FTN[1], 0.5, 0.9, 12, [0.3, 0.55, 0.8]);
+// ---- garden beds: kerb ring + sunken dirt. Bushes get planted on top further
+// down, with the destructibles, so every one of them is smashable
+{
+  const KERB = [0.52, 0.5, 0.55], KERB_SIDE = [0.4, 0.38, 0.44], DIRT = [0.24, 0.17, 0.11];
+  const K = 0.17, DROP = 0.06;
+  for (const b of BEDS) {
+    const y = b.base + BED_H, dy = y - DROP;
+    const x0 = b.x - b.hx, x1 = b.x + b.hx, z0 = b.z - b.hz, z1 = b.z + b.hz;
+    // kerb cap, four strips around the rim
+    world.groundQuad(x0, z0, x1, z0 + K, y, jit(KERB, 0.04));
+    world.groundQuad(x0, z1 - K, x1, z1, y, jit(KERB, 0.04));
+    world.groundQuad(x0, z0 + K, x0 + K, z1 - K, y, jit(KERB, 0.04));
+    world.groundQuad(x1 - K, z0 + K, x1, z1 - K, y, jit(KERB, 0.04));
+    // soil, a touch below the cap so the kerb reads as a lip
+    world.groundQuad(x0 + K, z0 + K, x1 - K, z1 - K, dy, jit(DIRT, 0.07));
+    // outer walls down to grade, inner walls down to the soil
+    world.quad([x0, b.base, z0], [x1, b.base, z0], [x1, y, z0], [x0, y, z0], jit(KERB_SIDE, 0.04));
+    world.quad([x1, b.base, z1], [x0, b.base, z1], [x0, y, z1], [x1, y, z1], jit(KERB_SIDE, 0.04));
+    world.quad([x0, b.base, z1], [x0, b.base, z0], [x0, y, z0], [x0, y, z1], jit(KERB_SIDE, 0.04));
+    world.quad([x1, b.base, z0], [x1, b.base, z1], [x1, y, z1], [x1, y, z0], jit(KERB_SIDE, 0.04));
+    world.quad([x0 + K, dy, z0 + K], [x1 - K, dy, z0 + K], [x1 - K, y, z0 + K], [x0 + K, y, z0 + K], KERB_SIDE);
+    world.quad([x1 - K, dy, z1 - K], [x0 + K, dy, z1 - K], [x0 + K, y, z1 - K], [x1 - K, y, z1 - K], KERB_SIDE);
+    world.quad([x0 + K, dy, z1 - K], [x0 + K, dy, z0 + K], [x0 + K, y, z0 + K], [x0 + K, y, z1 - K], KERB_SIDE);
+    world.quad([x1 - K, dy, z0 + K], [x1 - K, dy, z1 - K], [x1 - K, y, z1 - K], [x1 - K, y, z0 + K], KERB_SIDE);
+  }
+}
+// trees: trunk + clustered foliage blobs (PS2 park tree, not a xmas cone)
+// corners only — nothing stands in a run
+const trees = [[-33, -33], [33, -33], [-33, 33], [33, 33], [10, -25], [-34, 0], [36, -21]];
+for (const t of trees) {
+  world.cylY(t[0], 0, t[1], 0.24, 1.9, 7, [0.32, 0.22, 0.16], null);
+  world.bar([t[0], 1.5, t[1]], [t[0] + 0.7, 2.3, t[1] + 0.35], 0.09, [0.3, 0.21, 0.15]);
+  world.bar([t[0], 1.6, t[1]], [t[0] - 0.55, 2.4, t[1] - 0.4], 0.08, [0.3, 0.21, 0.15]);
+  world.blob(t[0], 2.9, t[1], 1.55, 1.2, 1.5, 9, 5, [0.1, 0.32, 0.17], 0.2);
+  world.blob(t[0] + 0.95, 2.4, t[1] + 0.45, 0.85, 0.7, 0.8, 8, 4, [0.12, 0.37, 0.19], 0.22);
+  world.blob(t[0] - 0.75, 2.5, t[1] - 0.6, 0.75, 0.65, 0.75, 8, 4, [0.09, 0.29, 0.16], 0.22);
+}
+// street lamps glowing — set just off the lane edges so they mark the runs
+const LAMPS = [[-14, 6], [20, 8], [16, 18], [-8, -20]];
+for (const p of LAMPS) {
+  world.box(p[0], 1.9, p[1], 0.18, 3.8, 0.18, [0.2, 0.18, 0.26]);
+  world.box(p[0], 3.85, p[1], 0.55, 0.3, 0.55, [1.0, 0.85, 0.5]);
+}
+// ---- plaza & street set dressing (all solid, see the solids list below) ----
+// chrome wheel monument — the town knows what it's about
+{
+  const sx = 16, sz = -16;   // SE landmark, opposite the fountain garden
+  world.box(sx, 0.45, sz, 2.2, 0.9, 2.2, [0.42, 0.38, 0.46]);
+  world.box(sx, 0.95, sz, 1.7, 0.14, 1.7, [0.5, 0.46, 0.54]);
+  const N2 = 14, r2 = 1.3, dirx = Math.cos(0.5), dirz = -Math.sin(0.5);
+  const rp = t => [sx + dirx * Math.cos(t) * r2, 2.4 + Math.sin(t) * r2, sz + dirz * Math.cos(t) * r2];
+  for (let i = 0; i < N2; i++) {
+    world.bar(rp(i / N2 * Math.PI * 2), rp((i + 1) / N2 * Math.PI * 2), 0.12, [0.75, 0.78, 0.85]);
+  }
+  for (const t of [0.5, 2.6, 4.7]) world.bar([sx, 2.4, sz], rp(t), 0.05, [0.6, 0.63, 0.7]);
+}
+// picnic tables
+const PICNIC = [[16, 30], [-34, 12]];
+for (const p of PICNIC) {
+  const gy = groundH(p[0], p[1]);
+  world.box(p[0], gy + 0.72, p[1], 1.9, 0.1, 0.85, [0.55, 0.38, 0.24]);
+  for (const s of [-1, 1]) {
+    world.box(p[0], gy + 0.44, p[1] + s * 0.62, 1.9, 0.07, 0.3, [0.5, 0.34, 0.22]);
+    world.box(p[0] + s * 0.8, gy + 0.36, p[1], 0.1, 0.72, 0.7, [0.42, 0.29, 0.2]);
+    world.box(p[0] + s * 0.8, gy + 0.4, p[1], 0.12, 0.08, 1.5, [0.42, 0.29, 0.2]);
+  }
+}
+// hot dog cart with a big striped umbrella
+{
+  const hx = -30, hz = -26;   // out of the spine's landing zone
+  world.box(hx, 0.75, hz, 1.5, 0.9, 0.85, [0.85, 0.82, 0.78]);
+  world.box(hx, 1.0, hz, 1.54, 0.16, 0.89, [0.82, 0.24, 0.2]);
+  world.box(hx, 1.24, hz + 0.15, 1.1, 0.07, 0.5, [0.6, 0.58, 0.56]);
+  for (const s of [-1, 1]) world.cylX(hx + s * 0.55, 0.28, hz - 0.25, 0.28, 0.12, 10, [0.25, 0.22, 0.2]);
+  world.bar([hx - 0.3, 1.2, hz], [hx - 0.3, 2.35, hz], 0.04, [0.55, 0.55, 0.6]);
+  world.cone(hx - 0.3, 2.15, hz, 1.15, 0.5, 10, [0.85, 0.25, 0.22]);
+  world.cone(hx - 0.3, 2.3, hz, 0.7, 0.35, 10, [0.92, 0.88, 0.8]);
+}
+// bus shelter on the north sidewalk
+{
+  const bx = SHELTER[0], bz = SHELTER[1], gy = groundH(bx, bz);
+  for (const s of [-1, 1]) world.box(bx + s * 1.4, gy + 1.2, bz + 0.7, 0.12, 2.4, 0.12, [0.22, 0.2, 0.28]);
+  world.box(bx, gy + 2.46, bz + 0.2, 3.6, 0.12, 1.6, [0.85, 0.4, 0.2]);
+  world.box(bx, gy + 1.35, bz + 0.76, 3.1, 1.8, 0.06, [0.4, 0.55, 0.6]);
+  world.box(bx, gy + 0.45, bz + 0.5, 2.6, 0.08, 0.4, [0.42, 0.29, 0.2]);
+}
+// mailboxes
+for (const p of [[50.7, 28], [-28, -50.7]]) {
+  const gy = groundH(p[0], p[1]);
+  world.box(p[0], gy + 0.52, p[1], 0.5, 0.5, 0.45, [0.2, 0.32, 0.68]);
+  world.cylX(p[0], gy + 0.78, p[1], 0.22, 0.48, 8, [0.22, 0.34, 0.7]);
+  world.box(p[0], gy + 0.72, p[1] + 0.2, 0.34, 0.06, 0.08, [0.12, 0.18, 0.4]);
+  for (const s of [-1, 1]) world.box(p[0] + s * 0.16, gy + 0.14, p[1], 0.06, 0.28, 0.06, [0.16, 0.15, 0.2]);
+}
+// dumpster parked on the west ring road
+{
+  const dx = -46.9, dz = 10;
+  world.box(dx, 0.75, dz, 1.4, 1.1, 2.4, [0.2, 0.45, 0.3]);
+  world.box(dx, 0.3, dz, 1.46, 0.2, 2.46, [0.15, 0.32, 0.22]);
+  world.box(dx - 0.1, 1.36, dz - 0.62, 1.3, 0.08, 1.1, [0.17, 0.38, 0.26]);
+  world.blob(dx - 0.15, 1.5, dz + 0.55, 0.42, 0.32, 0.42, 7, 3, [0.2, 0.2, 0.24], 0.3);
+  world.blob(dx + 0.25, 1.44, dz + 0.85, 0.3, 0.24, 0.3, 7, 3, [0.26, 0.25, 0.3], 0.3);
+}
+const worldMesh = world.mesh();
+
+// ---- destructibles: bushes & trash bags — whoosh through, they explode ----
+// three sizes so a planted row reads as shrubs, not as one asset stamped N times
+const bushMeshes = [0.82, 1.0, 1.18].map(s => {
+  const m = new MB();
+  m.blob(0, 0.42 * s, 0, 0.55 * s, 0.46 * s, 0.55 * s, 8, 4, [0.14, 0.4, 0.18], 0.28);
+  m.blob(0.32 * s, 0.3 * s, 0.16 * s, 0.34 * s, 0.3 * s, 0.34 * s, 7, 3, [0.11, 0.34, 0.15], 0.28);
+  m.blob(-0.3 * s, 0.33 * s, -0.14 * s, 0.3 * s, 0.28 * s, 0.3 * s, 7, 3, [0.17, 0.45, 0.2], 0.28);
+  return m.mesh();
+});
+const bagMB = new MB();
+bagMB.blob(0, 0.26, 0, 0.32, 0.28, 0.32, 7, 3, [0.18, 0.18, 0.23], 0.32);
+bagMB.blob(0.22, 0.18, -0.12, 0.22, 0.18, 0.22, 6, 3, [0.22, 0.22, 0.27], 0.32);
+bagMB.cylY(0, 0.5, 0, 0.05, 0.1, 6, [0.14, 0.14, 0.18], null);
+const bagMesh = bagMB.mesh();
+const softs = [];
+function addSoft(x, z, type, gy) {
+  softs.push({ x: x, z: z, gy: gy === undefined ? groundH(x, z) : gy, type: type,
+               up: true, t: 0, yaw: rnd() * Math.PI * 2, m: (rnd() * 3) | 0 });
+}
+// plant the beds: an evenly spaced row down the long axis, lightly jittered so
+// the row looks tended rather than stamped out
+for (const b of BEDS) {
+  const alongX = b.hx >= b.hz;
+  const reach = (alongX ? b.hx : b.hz) - 0.62;
+  for (let i = 0; i < b.n; i++) {
+    const t = b.n === 1 ? 0 : ((i / (b.n - 1)) * 2 - 1) * reach;
+    const jx = (rnd() - 0.5) * 0.2, jz = (rnd() - 0.5) * 0.2;
+    addSoft(b.x + (alongX ? t : 0) + jx, b.z + (alongX ? 0 : t) + jz, 'bush', b.base + BED_H - 0.06);
+  }
+}
+for (const b of [[41.2, -12], [-41.2, 18], [12, -41.2], [28, 41.2], [41.2, 36]]) addSoft(b[0], b[1], 'bag');
+
+// buildings ring (outside fence)
+const bld = new MB();
+{
+  const spots = [];
+  for (let i = 0; i < 18; i++) {
+    const ang = i / 18 * Math.PI * 2 + 0.12;
+    // project onto the square street grid so every facade lines up behind the sidewalk
+    const dx = Math.sin(ang), dz = Math.cos(ang);
+    const r = (61 + rnd() * 9) / Math.max(Math.abs(dx), Math.abs(dz));   // facades stay behind the sidewalk
+    spots.push([dx * r, dz * r]);
+  }
+  for (const s of spots) {
+    const w = 7 + rnd() * 8, d = 7 + rnd() * 8, h = 9 + rnd() * 18;
+    const base = [0.16 + rnd() * 0.06, 0.11 + rnd() * 0.05, 0.24 + rnd() * 0.08];
+    bld.box(s[0], h / 2, s[1], w, h, d, base);
+    bld.box(s[0], h + 0.4, s[1], w * 0.4, 0.8, d * 0.4, base);
+    // rooftop clutter: water towers, AC boxes, antennas
+    const roofPick = rnd();
+    if (roofPick < 0.4) {
+      const wx = s[0] + (rnd() - 0.5) * w * 0.35, wz = s[1] + (rnd() - 0.5) * d * 0.35;
+      bld.cylY(wx, h, wz, 0.95, 1.9, 8, [0.34, 0.24, 0.2], null);
+      bld.cone(wx, h + 1.9, wz, 1.0, 0.75, 8, [0.3, 0.21, 0.24]);
+    } else if (roofPick < 0.75) {
+      bld.bar([s[0] + w * 0.2, h, s[1]], [s[0] + w * 0.2, h + 2.4 + rnd() * 2.2, s[1]], 0.05, [0.2, 0.18, 0.26]);
+      bld.box(s[0] + w * 0.2, h + 2.4 + rnd() * 2.2, s[1], 0.14, 0.14, 0.14, [0.9, 0.25, 0.2]);
+    }
+    if (rnd() < 0.6) bld.box(s[0] - w * 0.22, h + 0.35, s[1] + d * 0.2, 1.2, 0.7, 0.95, [0.3, 0.29, 0.36]);
+    // windows on the face toward the plaza
+    const toward = Math.abs(s[0]) > Math.abs(s[1]) ? 'x' : 'z';
+    const sign = (toward === 'x' ? s[0] : s[1]) > 0 ? -1 : 1;
+    for (let wy = 2; wy < h - 1.5; wy += 2.4) {
+      for (let wu = -w / 2 + 1.2; wu < w / 2 - 1; wu += 2.1) {
+        const lit = rnd() < 0.55;
+        const c = lit ? [1.0, 0.8, 0.42] : [0.1, 0.1, 0.2];
+        if (toward === 'x') {
+          const x = s[0] + sign * (w / 2 + 0.06);
+          bld.quad([x, wy, s[1]+wu], [x, wy+1.2, s[1]+wu], [x, wy+1.2, s[1]+wu+0.9], [x, wy, s[1]+wu+0.9], c);
+        } else {
+          const z = s[1] + sign * (d / 2 + 0.06);
+          bld.quad([s[0]+wu, wy, z], [s[0]+wu+0.9, wy, z], [s[0]+wu+0.9, wy+1.2, z], [s[0]+wu, wy+1.2, z], c);
+        }
+      }
+    }
+  }
+  // second ring: far skyline towers silhouetted in the haze
+  for (let i = 0; i < 11; i++) {
+    const ang = i / 11 * Math.PI * 2 + 0.45;
+    const r = 95 + rnd() * 32;
+    const tw = 10 + rnd() * 11, th = 20 + rnd() * 32;
+    const tx = Math.sin(ang) * r, tz = Math.cos(ang) * r;
+    bld.box(tx, th / 2, tz, tw, th, tw, [0.13 + rnd() * 0.04, 0.09, 0.2 + rnd() * 0.05]);
+    if (rnd() < 0.5) {
+      bld.bar([tx, th, tz], [tx, th + 4 + rnd() * 3, tz], 0.09, [0.18, 0.15, 0.24]);
+      bld.box(tx, th + 4 + rnd() * 3, tz, 0.2, 0.2, 0.2, [0.9, 0.25, 0.2]);
+    }
+    // scattered lit windows so the towers read as buildings, not slabs
+    for (let wy = 3; wy < th - 2; wy += 3.2) {
+      if (rnd() < 0.55) continue;
+      const wu = (rnd() - 0.5) * tw * 0.7;
+      const toward = Math.abs(tx) > Math.abs(tz) ? 'x' : 'z';
+      const sign = (toward === 'x' ? tx : tz) > 0 ? -1 : 1;
+      if (toward === 'x')
+        bld.quad([tx + sign * (tw / 2 + 0.06), wy, tz + wu], [tx + sign * (tw / 2 + 0.06), wy + 1.4, tz + wu],
+                 [tx + sign * (tw / 2 + 0.06), wy + 1.4, tz + wu + 1.1], [tx + sign * (tw / 2 + 0.06), wy, tz + wu + 1.1], [0.95, 0.75, 0.4]);
+      else
+        bld.quad([tx + wu, wy, tz + sign * (tw / 2 + 0.06)], [tx + wu + 1.1, wy, tz + sign * (tw / 2 + 0.06)],
+                 [tx + wu + 1.1, wy + 1.4, tz + sign * (tw / 2 + 0.06)], [tx + wu, wy + 1.4, tz + sign * (tw / 2 + 0.06)], [0.95, 0.75, 0.4]);
+    }
+  }
+}
+const bldMesh = bld.mesh();
+
+// mountains (drawn with reduced fog so they silhouette above the haze)
+const mts = new MB();
+for (let i = 0; i < 13; i++) {
+  const ang = i / 13 * Math.PI * 2 + 0.3;
+  const r = 160 + rnd() * 70;
+  const h = 26 + rnd() * 44;
+  mts.cone(Math.sin(ang) * r, -2, Math.cos(ang) * r, 34 + rnd() * 30, h, 5, [0.2 + rnd()*0.04, 0.1, 0.28 + rnd()*0.05]);
+}
+const mtsMesh = mts.mesh();
+
+// traffic cones (drawn per-instance so they can be knocked over)
+const coneMB = new MB();
+coneMB.box(0, 0.03, 0, 0.62, 0.06, 0.62, [0.8, 0.33, 0.1]);
+coneMB.cone(0, 0.05, 0, 0.26, 0.55, 12, [0.92, 0.38, 0.1]);
+coneMB.cylY(0, 0.22, 0, 0.165, 0.11, 10, [0.9, 0.86, 0.8], null);
+const coneMesh = coneMB.mesh();
+const cones = [];
+function addCone(x, z) { cones.push({ x: x, z: z, gy: groundH(x, z), up: true, f: 0, yaw: 0, t: 0, vx: 0, vz: 0, spin: 0 }); }
+// cones double as lane markers: they line the runs, so the eye follows a run
+// even before you know the map — and you get to flatten them on the way through
+for (let z = -14; z <= 30; z += 5.5) { addCone(-LANE_W - 1.4, z); addCone(LANE_W + 1.4, z); }   // boulevard
+for (let z = -16; z <= 16; z += 6.5) addCone(33.6, z);                                          // east lane, along the QP wall
+for (let z = -6; z <= 16; z += 5.5) addCone(-28.4, z);                                          // west lane
+for (let i = 0; i < 5; i++) {   // ring around the pyramid
+  const a = i / 5 * Math.PI * 2 + 0.6;
+  addCone(PYR.cx + Math.sin(a) * 7, PYR.cz + Math.cos(a) * 7);
+}
+addCone(-10, -34); addCone(-6, -34); addCone(11.5, -33);   // terrace toppers
+addCone(-2, 46); addCone(-2, 49);                           // up on the depot roof
+
+// solid obstacles: [x, z, radius, type?] — radii hug the visible shape so you
+// only feel a hit when you can see one
+const solids = [[FTN[0], FTN[1], 3.4]];
+for (const t of trees) solids.push([t[0], t[1], 0.3]);
+for (const p of LAMPS) solids.push([p[0], p[1], 0.28]);
+solids.push([16, -16, 1.25]);                      // wheel monument
+for (const p of PICNIC) solids.push([p[0], p[1], 1.05]);
+solids.push([-30, -26, 0.85]);                     // hot dog cart
+solids.push([0, 41, 1.7]);                         // the kiosk you gap off the bank
+solids.push([SHELTER[0] - 1.4, SHELTER[1] + 0.7, 0.2], [SHELTER[0] + 1.4, SHELTER[1] + 0.7, 0.2]);   // bus shelter posts
+solids.push([50.7, 28, 0.4], [-28, -50.7, 0.4]);   // mailboxes
+solids.push([-46.9, 9.3, 0.85], [-46.9, 10.7, 0.85]);  // dumpster
+// parked cars, two circles each — plaza strays + everything curbside on the ring road
+for (const c of [[47.2, 32], [-47.2, -34], [-33.8, 20], [47.2, -20], [47.2, 8], [-47.2, -4], [-47.2, 26]]) {
+  solids.push([c[0], c[1] - 0.95, 1.2, 'car'], [c[0], c[1] + 0.95, 1.2, 'car']);
+}
+for (const c of [[40, 47.2], [-40, 47.2], [-4, -47.2], [22, -47.2]]) {   // parked along x
+  solids.push([c[0] - 0.95, c[1], 1.2, 'car'], [c[0] + 0.95, c[1], 1.2, 'car']);
+}
+// street furniture is physical now that the block is rideable
+for (const u of LAMP_U) {
+  if (Math.abs(u) > DEPOT_CLR) solids.push([u, 50, 0.35]);
+  solids.push([u, -50, 0.35], [50, u, 0.35], [-50, u, 0.35]);
+}
+for (const p of HYDRANTS) solids.push([p[0], p[1], 0.3]);
+for (const p of TRASH) solids.push([p[0], p[1], 0.4]);
+// benches: two tight circles along the seat instead of one fat one
+for (const p of BENCHES) {
+  const ox = p[2] === 'x' ? 0.65 : 0, oz = p[2] === 'z' ? 0.65 : 0;
+  solids.push([p[0] - ox, p[1] - oz, 0.5], [p[0] + ox, p[1] + oz, 0.5]);
+}
+solids.push([49.6, 49.6, 0.3], [-49.6, -49.6, 0.3]);   // traffic lights
+solids.push([6.55, 50.45, 0.3], [-6.55, 50.45, 0.3]);  // ENDO! sign posts, up on the roof
+for (const p of ROOF_AC) solids.push([p[0], p[1], 0.8]);   // rooftop AC units
+solids.push([-6, 47, 0.2]);                                // rooftop mast
+
+// shadow blob
+const shMB = new MB();
+{
+  const n = 16;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    shMB.tri([0, 0, 0], [Math.sin(t1) * 0.5, 0, Math.cos(t1) * 0.95], [Math.sin(t0) * 0.5, 0, Math.cos(t0) * 0.95], [0.05, 0.02, 0.08]);
+  }
+}
+const shadowMesh = shMB.mesh();
+
+// skid marks (ring buffer of quads, rebuilt on write)
+const MAX_MARKS = 700;
+const marks = [];
+let marksDirty = false;
+const marksBuf = gl.createBuffer();
+let marksN = 0;
+function addMark(x, z, yaw, len, w) {
+  marks.push([x, z, yaw, len, w]);
+  if (marks.length > MAX_MARKS) marks.shift();
+  marksDirty = true;
+}
+function rebuildMarks() {
+  const mb = new MB();
+  for (const m of marks) {
+    const c = Math.cos(m[2]), s = Math.sin(m[2]), hw = m[4], hl = m[3];
+    mb.quad(
+      [m[0] - c * hw - s * hl, 0.0142, m[1] + s * hw - c * hl],
+      [m[0] + c * hw - s * hl, 0.0142, m[1] - s * hw - c * hl],
+      [m[0] + c * hw + s * hl, 0.0142, m[1] - s * hw + c * hl],
+      [m[0] - c * hw + s * hl, 0.0142, m[1] + s * hw + c * hl],
+      [0.1, 0.08, 0.12]);
+  }
+  const data = new Float32Array(mb.a);
+  gl.bindBuffer(gl.ARRAY_BUFFER, marksBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+  marksN = data.length / 9;
+  marksDirty = false;
+}
+
+// dust & debris particles (billboarded quads, rebuilt per frame)
+const parts = [];
+const partsBuf = gl.createBuffer();
+function spawnDust(x, y, z, n, col, kick, spread, scale) {
+  for (let i = 0; i < n; i++) {
+    if (parts.length > 420) parts.shift();
+    const a = Math.random() * Math.PI * 2, r = Math.random() * (spread || 0.35);
+    parts.push({
+      x: x + Math.sin(a) * r, y: y + Math.random() * 0.15, z: z + Math.cos(a) * r,
+      vx: Math.sin(a) * (0.6 + Math.random()), vy: (kick || 1.2) * (0.4 + Math.random() * 0.8),
+      vz: Math.cos(a) * (0.6 + Math.random()),
+      t: 0, life: 0.35 + Math.random() * 0.4,
+      s: (0.05 + Math.random() * 0.07) * (scale || 1), col: col
+    });
+  }
+}
+const DUST = [0.55, 0.5, 0.55], DUST_CONE = [0.92, 0.42, 0.12];
+const LEAF_A = [0.16, 0.45, 0.2], LEAF_B = [0.1, 0.32, 0.15], TRASH_A = [0.32, 0.32, 0.38];
+function drawParticles(dt, camYaw) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.t += dt;
+    if (p.t > p.life) { parts.splice(i, 1); continue; }
+    p.vy -= 5.5 * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    p.vx *= Math.max(0, 1 - 2.5 * dt); p.vz *= Math.max(0, 1 - 2.5 * dt);
+  }
+  if (!parts.length) return;
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  const mb = new MB();
+  for (const p of parts) {
+    const s = p.s * (1 + p.t * 2);
+    mb.quad(
+      [p.x - rx * s, p.y - s, p.z - rz * s], [p.x + rx * s, p.y - s, p.z + rz * s],
+      [p.x + rx * s, p.y + s, p.z + rz * s], [p.x - rx * s, p.y + s, p.z - rz * s], p.col);
+  }
+  const data = new Float32Array(mb.a);
+  gl.bindBuffer(gl.ARRAY_BUFFER, partsBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+  gl.enable(gl.BLEND);
+  gl.depthMask(false);
+  drawMesh({ buf: partsBuf, n: data.length / 9 }, IDENT, 1, 0.85, 0);
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+}
+
+// ================================================================
+//  THE GARAGE — six bikes, each a different way to ride the same city
+// ================================================================
+// Stats are multipliers on the base bike (STREET RAT is all 1.0), so nothing
+// here can break the physics — every hook below is `base * BS.<stat>`:
+//   acc   pedal punch          top   terminal speed (drag divisor + VMAX)
+//   spin  air rotation AND pivot rate    hop  bunny-hop / pogo pop
+//   bal   auto-balance strength + pocket width    brake  front-brake bite
+// Look knobs: tube (frame gauge), bar (riser height), barW (bar width),
+// seat (saddle offset), mag (0 spoked / n-blade mag wheel), pegs.
+const BIKES = [
+  { id: 'street', name: 'STREET RAT', blurb: 'does everything, excuses nothing',
+    acc: 1, top: 1, spin: 1, hop: 1, bal: 1, brake: 1,
+    frame: [0.9, 0.13, 0.42], accent: [0.72, 0.75, 0.82], rim: [0.6, 0.63, 0.7],
+    tire: [0.11, 0.11, 0.13], shirt: [0.06, 0.62, 0.6], helmet: [0.95, 0.78, 0.14],
+    tube: 1, bar: 1, barW: 1, seat: 0, mag: 0, pegs: false },
+
+  { id: 'flat', name: 'FLATLAND 360', blurb: 'spins forever · lazy off the line',
+    acc: 0.85, top: 0.85, spin: 1.5, hop: 0.95, bal: 1.3, brake: 1.1,
+    frame: [0.55, 0.2, 0.86], accent: [0.86, 0.88, 0.94], rim: [0.9, 0.9, 0.95],
+    tire: [0.13, 0.13, 0.15], shirt: [0.93, 0.93, 0.96], helmet: [0.62, 0.24, 0.9],
+    tube: 0.92, bar: 1.15, barW: 1.02, seat: -0.03, mag: 3, pegs: true },
+
+  { id: 'dirt', name: 'DIRT JUMPER', blurb: 'enormous pop · slow to turn',
+    acc: 1.05, top: 1.05, spin: 0.85, hop: 1.35, bal: 0.9, brake: 0.95,
+    frame: [0.95, 0.42, 0.06], accent: [0.32, 0.33, 0.38], rim: [0.5, 0.52, 0.58],
+    tire: [0.1, 0.1, 0.11], shirt: [0.16, 0.3, 0.7], helmet: [0.9, 0.9, 0.92],
+    tube: 1.28, bar: 1.08, barW: 1.06, seat: -0.05, mag: 0, pegs: false },
+
+  { id: 'race', name: 'CHROME BULLET', blurb: 'fastest thing in the plaza',
+    acc: 1.35, top: 1.3, spin: 0.85, hop: 0.85, bal: 0.8, brake: 1.15,
+    frame: [0.78, 0.82, 0.9], accent: [0.1, 0.75, 0.85], rim: [0.75, 0.78, 0.86],
+    tire: [0.12, 0.12, 0.14], shirt: [0.9, 0.16, 0.3], helmet: [0.12, 0.14, 0.2],
+    tube: 0.82, bar: 0.35, barW: 1.1, seat: 0.1, mag: 0, pegs: false },
+
+  { id: 'trials', name: 'TRIALS MULE', blurb: 'lives on one wheel · no top end',
+    acc: 0.85, top: 0.7, spin: 0.95, hop: 1.2, bal: 1.45, brake: 1.3,
+    frame: [0.1, 0.62, 0.32], accent: [0.2, 0.21, 0.25], rim: [0.34, 0.36, 0.4],
+    tire: [0.09, 0.09, 0.1], shirt: [0.95, 0.55, 0.1], helmet: [0.1, 0.12, 0.16],
+    tube: 1.18, bar: 1.3, barW: 0.94, seat: -0.1, mag: 0, pegs: true },
+
+  { id: 'hornet', name: 'THE HORNET', blurb: 'all spin, no mercy · twitchy',
+    acc: 1, top: 0.9, spin: 1.75, hop: 1.15, bal: 0.75, brake: 0.9,
+    frame: [0.95, 0.8, 0.05], accent: [0.14, 0.13, 0.16], rim: [0.2, 0.2, 0.24],
+    tire: [0.12, 0.12, 0.13], shirt: [0.14, 0.14, 0.18], helmet: [0.95, 0.8, 0.05],
+    tube: 0.95, bar: 1.2, barW: 0.9, seat: -0.04, mag: 5, pegs: true }
+];
+let bikeIdx = 0;
+try {
+  const saved = BIKES.findIndex(b => b.id === localStorage.getItem('endo_bike'));
+  if (saved >= 0) bikeIdx = saved;
+} catch (e) {}
+let BS = BIKES[bikeIdx];
+
+let COL_FRAME = [0.9, 0.13, 0.42], COL_CHROME = [0.72, 0.75, 0.82], COL_TIRE = [0.11, 0.11, 0.13];
+let COL_SHIRT = [0.06, 0.62, 0.6], COL_HELMET = [0.95, 0.78, 0.14];
+const COL_PANTS = [0.2, 0.19, 0.26], COL_SKIN = [0.85, 0.6, 0.44];
+const WHEEL_R = 0.34;
+const HEAD = [0, 0.98, 0.38];          // steering pivot in bike space
+const AXLE_F_REL = [0, -0.64, 0.15];   // front axle relative to HEAD
+
+// every mesh that changes with the bike, rebuilt on selection. GRIP is where the
+// hands land, derived from the bar geometry so tall bars carry the arms with them
+let frameMesh, forkMesh, tireMesh, hubMesh, torsoMesh, GRIP;
+function buildRig(b) {
+  for (const m of [frameMesh, forkMesh, tireMesh, hubMesh, torsoMesh]) if (m) gl.deleteBuffer(m.buf);
+  COL_FRAME = b.frame; COL_CHROME = b.accent; COL_TIRE = b.tire;
+  COL_SHIRT = b.shirt; COL_HELMET = b.helmet;
+  const tb = b.tube, bw = b.barW, st = b.seat, rise = 0.06 * b.bar, brY = 0.118;
+  GRIP = [0.29 * bw, brY + rise * 1.083, -0.078];
+
+const frameMB = new MB();
+frameMB.bar(HEAD, [0, 0.34, -0.02], 0.038 * tb, COL_FRAME);            // down tube
+frameMB.bar([0, 0.95, 0.35], [0, 0.9, -0.28], 0.032 * tb, COL_FRAME);  // top tube
+frameMB.bar([0, 0.9, -0.3], [0, 0.36, -0.04], 0.032 * tb, COL_FRAME);  // seat tube
+frameMB.bar([0.045, 0.88, -0.3], [0.045, 0.34, -0.53], 0.02 * tb, COL_FRAME);
+frameMB.bar([-0.045, 0.88, -0.3], [-0.045, 0.34, -0.53], 0.02 * tb, COL_FRAME);
+frameMB.bar([0.045, 0.34, -0.02], [0.045, 0.34, -0.53], 0.02 * tb, COL_FRAME);
+frameMB.bar([-0.045, 0.34, -0.02], [-0.045, 0.34, -0.53], 0.02 * tb, COL_FRAME);
+frameMB.bar([0, 0.9, -0.3], [0, 1.02 + st, -0.35], 0.026, COL_CHROME);         // seat post
+frameMB.box(0, 1.04 + st, -0.35, 0.1, 0.045, 0.26, [0.12, 0.1, 0.14]);         // saddle
+frameMB.bar([-0.07, 0.34, -0.02], [0.07, 0.34, -0.02], 0.03, COL_CHROME);
+// drivetrain: chainring + chain runs to the rear hub
+frameMB.cylX(0.075, 0.34, -0.02, 0.095, 0.02, 12, [0.32, 0.32, 0.38]);
+frameMB.bar([0.062, 0.425, -0.03], [0.05, 0.395, -0.52], 0.011, [0.22, 0.22, 0.26]);
+frameMB.bar([0.062, 0.255, -0.03], [0.05, 0.29, -0.52], 0.011, [0.22, 0.22, 0.26]);
+if (b.pegs) for (const s of [-1, 1]) frameMB.bar([s * 0.06, 0.34, -0.53], [s * 0.15, 0.34, -0.53], 0.026, COL_CHROME);
+frameMesh = frameMB.mesh();
+
+const forkMB = new MB();   // local origin = HEAD
+// crown + two-segment tapered legs with dropouts (reads round, not flat)
+forkMB.box(0, -0.035, 0.028, 0.145, 0.065, 0.075, COL_CHROME);
+for (const s of [-1, 1]) {
+  forkMB.bar([s * 0.055, -0.055, 0.032], [s * 0.058, -0.37, 0.092], 0.024 * tb, COL_CHROME);
+  forkMB.bar([s * 0.058, -0.37, 0.092], [s * 0.05, -0.64, 0.15], 0.019 * tb, COL_CHROME);
+  forkMB.box(s * 0.052, -0.615, 0.147, 0.03, 0.075, 0.055, [0.5, 0.52, 0.58]);
+  if (b.pegs) forkMB.bar([s * 0.06, -0.64, 0.15], [s * 0.15, -0.64, 0.15], 0.026, COL_CHROME);
+}
+forkMB.bar([0, -0.06, 0.01], [0, 0.105, -0.02], 0.03, COL_CHROME);     // steerer
+forkMB.box(0, 0.115, -0.025, 0.075, 0.055, 0.105, [0.3, 0.3, 0.36]);   // stem
+// bars: clamp → rise → sweep out to fat grips, with a crossbar. `rise` is what
+// separates a low race bar from a set of flatland risers
+for (const s of [-1, 1]) {
+  forkMB.bar([0, brY, -0.032], [s * 0.1 * bw, brY + rise, -0.038], 0.021, COL_CHROME);
+  forkMB.bar([s * 0.1 * bw, brY + rise, -0.038], [s * 0.245 * bw, brY + rise * 1.167, -0.058], 0.02, COL_CHROME);
+  forkMB.bar([s * 0.245 * bw, brY + rise * 1.167, -0.058], [s * 0.33 * bw, brY + rise * 1.067, -0.095], 0.026, [0.1, 0.1, 0.12]);
+  forkMB.bar([s * 0.33 * bw, brY + rise * 1.067, -0.095], [s * 0.345 * bw, brY + rise * 1.05, -0.101], 0.018, [0.16, 0.16, 0.2]);
+}
+forkMB.bar([-0.1 * bw, brY + rise, -0.038], [0.1 * bw, brY + rise, -0.038], 0.016, COL_CHROME);  // crossbar
+forkMB.box(0.115 * bw, brY + rise * 0.95, -0.065, 0.055, 0.038, 0.085, [0.75, 0.1, 0.2]);       // THE brake lever
+forkMB.box(0, -0.31, 0.12, 0.13, 0.09, 0.05, [0.5, 0.11, 0.18]);       // caliper straddling the tire
+forkMB.bar([0.09, brY + rise * 0.7, -0.04], [0.03, -0.28, 0.1], 0.008, [0.12, 0.12, 0.15]);  // brake cable
+forkMesh = forkMB.mesh();
+
+// tire: smooth-shaded torus (matte rubber) — properly round in cross-section,
+// drawn separately from the shiny hub
+const tireMB = new MB();
+{
+  const n = 26, m = 7, R0 = 0.2925, rr = 0.0475, wx = 0.038, PHI = 1.35;
+  const P = (dd, ph) => [wx * Math.sin(ph), dd[0] * (R0 + rr * Math.cos(ph)), dd[1] * (R0 + rr * Math.cos(ph))];
+  const Nn = (dd, ph) => vNorm([Math.sin(ph) / wx, dd[0] * Math.cos(ph) / rr, dd[1] * Math.cos(ph) / rr]);
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    const d0 = [Math.cos(t0), Math.sin(t0)], d1 = [Math.cos(t1), Math.sin(t1)];
+    for (let j = 0; j < m; j++) {
+      const p0 = -PHI + j / m * 2 * PHI, p1 = -PHI + (j + 1) / m * 2 * PHI;
+      tireMB.raw(P(d0, p0), P(d0, p1), P(d1, p1), Nn(d0, p0), Nn(d0, p1), Nn(d1, p1), COL_TIRE);
+      tireMB.raw(P(d0, p0), P(d1, p1), P(d1, p0), Nn(d0, p0), Nn(d1, p1), Nn(d1, p0), COL_TIRE);
+    }
+    // sidewalls close down to the rim from the torus edges
+    const RI = 0.243;
+    for (const s of [-1, 1]) {
+      const e0 = P(d0, s * PHI), e1 = P(d1, s * PHI);
+      const r0 = [e0[0] * 0.8, d0[0] * RI, d0[1] * RI], r1 = [e1[0] * 0.8, d1[0] * RI, d1[1] * RI];
+      if (s > 0) tireMB.quad(r0, e0, e1, r1, COL_TIRE);
+      else tireMB.quad(r0, r1, e1, e0, COL_TIRE);
+    }
+  }
+}
+tireMesh = tireMB.mesh();
+const hubMB = new MB();
+{
+  // open rim band (no end caps — the spokes stay visible through the wheel)
+  const n = 16, r = 0.25, ri = 0.215, h = 0.0225, RIM = b.rim;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n * Math.PI * 2, t1 = (i + 1) / n * Math.PI * 2;
+    const y0 = Math.cos(t0), z0 = Math.sin(t0), y1 = Math.cos(t1), z1 = Math.sin(t1);
+    hubMB.quad([-h, y0 * r, z0 * r], [-h, y1 * r, z1 * r], [h, y1 * r, z1 * r], [h, y0 * r, z0 * r], RIM);
+    hubMB.quad([h, y0 * ri, z0 * ri], [h, y0 * r, z0 * r], [h, y1 * r, z1 * r], [h, y1 * ri, z1 * ri], RIM);
+    hubMB.quad([-h, y0 * ri, z0 * ri], [-h, y1 * ri, z1 * ri], [-h, y1 * r, z1 * r], [-h, y0 * r, z0 * r], RIM);
+  }
+}
+hubMB.cylX(0, 0, 0, 0.06, 0.1, 10, COL_CHROME);           // hub
+if (b.mag) {
+  // mag wheel: fat cast blades instead of a lace of spokes
+  for (let i = 0; i < b.mag; i++) {
+    const a = i * Math.PI * 2 / b.mag;
+    hubMB.bar([0, 0, 0], [0, Math.cos(a) * 0.235, Math.sin(a) * 0.235], 0.035, b.rim);
+  }
+} else {
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 4;
+    hubMB.bar([0, -Math.cos(a) * 0.235, -Math.sin(a) * 0.235], [0, Math.cos(a) * 0.235, Math.sin(a) * 0.235], 0.011, COL_CHROME);
+  }
+}
+hubMesh = hubMB.mesh();
+
+const torsoMB = new MB();  // local origin = hip
+torsoMB.orb(0, 0.035, 0.005, 0.138, 0.095, 0.105, 12, 6, COL_PANTS);  // pelvis
+{
+  // lofted torso: elliptical rings from waist up over the shoulder yoke and in
+  // to the neck, smooth-shaded, so the body has no hard corner anywhere. The
+  // ring at 0.462 IS the shoulder line — the deltoids that hang off it are drawn
+  // with the arms (dynamic), so a shoulder swings with its arm instead of
+  // sitting there as a box.
+  const L = [           // [y, half-width, half-depth, z-center, normal y-bias]
+    [0.055, 0.128, 0.088, 0.0, 0.2],
+    [0.19, 0.119, 0.081, 0.014, 0.2],
+    [0.31, 0.153, 0.099, 0.032, 0.25],
+    [0.41, 0.176, 0.107, 0.046, 0.35],
+    [0.462, 0.184, 0.103, 0.048, 0.55],   // shoulder line
+    [0.505, 0.140, 0.084, 0.044, 0.95],   // trapezius rolling in
+    [0.538, 0.090, 0.063, 0.040, 1.4]     // neck base
+  ];
+  const NR = 10;
+  const rp = (l, k) => { const a = (k + 0.5) / NR * Math.PI * 2; return [Math.sin(a) * l[1], l[0], l[3] + Math.cos(a) * l[2]]; };
+  // the y-bias per ring stands in for the surface slope, so the shoulders and
+  // traps light like a curved shell rather than a stack of tubes
+  const rn = (l, k) => { const a = (k + 0.5) / NR * Math.PI * 2; return vNorm([Math.sin(a) / l[1], l[4], Math.cos(a) / l[2]]); };
+  for (let j = 0; j < L.length - 1; j++) {
+    for (let k = 0; k < NR; k++) {
+      const k1 = (k + 1) % NR;
+      // the two front-facing panels wear the racing stripe
+      const col = (k === 0 || k === NR - 1) ? COL_HELMET : COL_SHIRT;
+      torsoMB.raw(rp(L[j], k), rp(L[j], k1), rp(L[j + 1], k1), rn(L[j], k), rn(L[j], k1), rn(L[j + 1], k1), col);
+      torsoMB.raw(rp(L[j], k), rp(L[j + 1], k1), rp(L[j + 1], k), rn(L[j], k), rn(L[j + 1], k1), rn(L[j + 1], k), col);
+    }
+  }
+  const topL = L[L.length - 1], up = [0, 1, 0];   // domed cap between the traps
+  for (let k = 0; k < NR; k++) {
+    torsoMB.raw([0, 0.556, topL[3]], rp(topL, (k + 1) % NR), rp(topL, k), up, rn(topL, (k + 1) % NR), rn(topL, k), COL_SHIRT);
+  }
+}
+torsoMB.limb([0, 0.5, 0.042], [0, 0.6, 0.046], 0.043, 0.047, COL_SKIN);   // neck
+torsoMB.orb(0, 0.628, 0.045, 0.062, 0.072, 0.066, 12, 8, COL_SKIN);       // head
+// helmet: smooth-shaded dome, stretched front-back, with vent stripes,
+// a dark rim band and a visor peak
+{
+  const hc = [0, 0.651, 0.042], rx = 0.107, ry = 0.128, rz = 0.128;
+  const LON = 16, LAT = 6;
+  const HP = (i, j) => {
+    const ph = (j / LAT) * Math.PI / 2, th = i / LON * Math.PI * 2;
+    const cp = Math.cos(ph);
+    return [hc[0] + Math.sin(th) * cp * rx, hc[1] + Math.sin(ph) * ry, hc[2] + Math.cos(th) * cp * rz];
+  };
+  const HN = (i, j) => {
+    const ph = (j / LAT) * Math.PI / 2, th = i / LON * Math.PI * 2;
+    const cp = Math.cos(ph);
+    return vNorm([Math.sin(th) * cp / rx, Math.sin(ph) / ry, Math.cos(th) * cp / rz]);
+  };
+  const VENT = [0.78, 0.6, 0.1];
+  for (let i = 0; i < LON; i++) for (let j = 0; j < LAT; j++) {
+    const i1 = (i + 1) % LON;
+    const col = (i % 4 === 2 && j > 0 && j < LAT - 2) ? VENT : COL_HELMET;
+    const q0 = HP(i, j), q1 = HP(i1, j), q2 = HP(i1, j + 1), q3 = HP(i, j + 1);
+    torsoMB.raw(q0, q1, q2, HN(i, j), HN(i1, j), HN(i1, j + 1), col);
+    torsoMB.raw(q0, q2, q3, HN(i, j), HN(i1, j + 1), HN(i, j + 1), col);
+  }
+  torsoMB.cylY(0, 0.635, 0.042, 0.112, 0.022, 14, [0.18, 0.16, 0.22], null); // rim band
+  torsoMB.box(0, 0.651, 0.152, 0.14, 0.02, 0.085, [0.15, 0.13, 0.18]);       // visor peak
+}
+torsoMesh = torsoMB.mesh();
+}
+buildRig(BS);
+
+const dynBuf = gl.createBuffer();  // limbs, rebuilt per frame
+
+// ================================================================
+//  STATE
+// ================================================================
+const P = {
+  ACC: 11, VMAX: 18, BRAKE: 15, HALF: 0.53, L: 1.06,
+  KB: 0.55, SUSTAIN: 2.6, KW: 7.5, LEANT: 5.0, BODY: 5.0,
+  AE: 6.5, BALE: 0.75, CRE: 1.35,
+  AW: 5.5, BALW: -0.42, CRW: -1.08,
+  DAMP: 2.0, LIFT: 3.4,
+  ASSIST: 28, ASSIST_W: 0.35
+};
+// bk.h is ALWAYS the direction of travel and bk.v is always (near enough) positive.
+// bk.fakie is the stance flag: true means the bike is pointed backwards along that
+// travel direction. The rendered facing is bk.h + PI*fakie, and S = fakie ? -1 : 1
+// converts between the two frames. Keeping travel in bk.h is what lets pedalling,
+// drag, gravity, steering, crest launches and brake-endos all work in switch with
+// no special cases — see the stance notes in physStep.
+const bk = {
+  x: SPAWN.x, z: SPAWN.z, h: SPAWN.h, v: 0, fakie: false, pitch: 0, pitchVel: 0, endoT: 0,
+  y: 0, vy: 0, gp: 0, gpArm: 0, armT: 0, air: false, airT: 0, airDeg: 0, wvx: 0, wvz: 0,
+  takeX: 0, takeZ: 0, takeY: 0, peakY: 0, takeSw: false, pedalT: 0,
+  pogo: false, hopAir: false, bankAir: false, hopBuf: 0,
+  steerVis: 0, yawVel: 0, curYaw: 0, roll: 0,
+  sus: 0, susVel: 0, vPitch: 0, crouch: 0, sway: 0, wob: 0, wobT: 0, stairAcc: 0,
+  fSpin: 0, rSpin: 0, rSpinVel: 0, crank: 0, torsoRot: 0, twist: 0, bob: 0,
+  state: 'ride', crashT: 0, crashType: '', invuln: 0,
+  ragP: [0, 0, 0], ragV: [0, 0, 0], ragR: 0
+};
+const input = { pedal: false, brake: false, lean: false, left: false, right: false, hop: false };
+let started = false, muted = false, shake = 0, hintT = 8, hornT = 0;
+
+// scoring & the 2:00 run
+let score = 0, bestCombo = 0, bestRun = 0;
+try {
+  bestCombo = parseInt(localStorage.getItem('endo_best') || '0', 10) || 0;
+  bestRun = parseInt(localStorage.getItem('endo_bestrun') || '0', 10) || 0;
+} catch (e) {}
+const combo = { chain: [], pts: 0, bankT: 0 };
+let curWheelie = null, curEndo = null, fakieT = 0, fakieDone = false;
+const RUN_LEN = 120;
+// provisional rescale to real playtest scores (Alec runs ~146k, best 180k) —
+// revisit once the scoring economy gets a proper pass
+const MEDALS = [['GOLD', 150000], ['SILVER', 75000], ['BRONZE', 30000]];
+let runT = RUN_LEN, runOver = false, graceT = 0, paused = false;
+const runStats = { bestCombo: 0, cones: 0, bushes: 0, air: 0 };
+
+// session goals, THPS-style; completion persists
+const GOALS = [
+  ['gap', 'GAP IT', 'clear the kicker gap'],
+  ['pivot360', 'DIZZY SPINNER', 'pivot 360° on the front wheel'],
+  ['cones8', 'CONE CARNAGE', 'flatten 8 cones in one run'],
+  ['wheelie6', 'MARATHON MANUAL', 'hold a wheelie for 6 seconds'],
+  ['switch', 'SWITCH IT UP', 'land a 180 and ride away switch'],
+  ['combo5k', 'HIGH ROLLER', 'bank a 5,000+ combo'],
+  ['spine', 'SPINE FLY', 'boost a big air off the spine'],
+  ['stairs', 'STAIR SURFER', 'launch off the stair terrace'],
+  ['street', 'JAYWALKER', 'take it to the streets'],
+  ['qp', 'PIPE DREAM', 'blast air out of a quarter pipe'],
+  ['roof', 'ROOF ACCESS', 'gap the bank onto the depot roof'],
+  ['special', 'SIGNATURE MOVE', 'land a ★ trick line']
+];
+let goalsDone = {};
+try { goalsDone = JSON.parse(localStorage.getItem('endo_goals') || '{}'); } catch (e) {}
+function goalCount() { return GOALS.filter(g => goalsDone[g[0]]).length; }
+function completeGoal(id) {
+  if (goalsDone[id]) return;
+  goalsDone[id] = 1;
+  try { localStorage.setItem('endo_goals', JSON.stringify(goalsDone)); } catch (e) {}
+  const g = GOALS.find(g2 => g2[0] === id);
+  score += 500;
+  el.goalpop.textContent = 'GOAL ✓ ' + g[1] + '  +500';
+  el.goalpop.className = 'thps';
+  void el.goalpop.offsetWidth;
+  el.goalpop.className = 'thps show';
+  el.goals.textContent = 'GOALS ' + goalCount() + '/' + GOALS.length;
+  if (AC) [880, 1108, 1318, 1760].forEach((f, i) => setTimeout(() => sfx(f, 0.14, 'square', 0.13), i * 80));
+}
+
+// ================================================================
+//  AUDIO
+// ================================================================
+let AC = null, master = null, skidGain = null, windGain = null, musicBus = null, delaySend = null;
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(AC.destination);
+    const len = AC.sampleRate;
+    const nb = AC.createBuffer(1, len, AC.sampleRate);
+    const d = nb.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = AC.createBufferSource(); src.buffer = nb; src.loop = true;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 0.8;
+    skidGain = AC.createGain(); skidGain.gain.value = 0;
+    src.connect(bp); bp.connect(skidGain); skidGain.connect(master);
+    src.start();
+    // wind bed, swells with speed
+    const wsrc = AC.createBufferSource(); wsrc.buffer = nb; wsrc.loop = true;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320;
+    windGain = AC.createGain(); windGain.gain.value = 0;
+    wsrc.connect(lp); lp.connect(windGain); windGain.connect(master);
+    wsrc.start();
+    // music bus with a dotted-eighth echo for the arp
+    musicBus = AC.createGain(); musicBus.gain.value = 0.9; musicBus.connect(master);
+    delaySend = AC.createGain(); delaySend.gain.value = 0.5;
+    const dly = AC.createDelay(1); dly.delayTime.value = 0.4327; // dotted 8th at 104bpm
+    const fb = AC.createGain(); fb.gain.value = 0.35;
+    delaySend.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(musicBus);
+  } catch (e) { AC = null; }
+}
+
+// ---- procedural synthwave loop: Am F C G at 104bpm ----
+const BPM = 104, BEAT = 60 / BPM, BAR = BEAT * 4;
+const CHORDS = [
+  { root: 55.0,  pad: [220.0, 261.63, 329.63] },   // Am
+  { root: 43.65, pad: [220.0, 261.63, 349.23] },   // F
+  { root: 65.41, pad: [196.0, 261.63, 329.63] },   // C
+  { root: 49.0,  pad: [196.0, 246.94, 293.66] }    // G
+];
+let musicBar = 0, musicNext = 0;
+function note(t, freq, dur, type, vol, dest, filt) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  let head = o;
+  if (filt) {
+    const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filt;
+    o.connect(f); head = f;
+  }
+  head.connect(g); g.connect(dest);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function scheduleBar(t, bar) {
+  const ch = CHORDS[bar % 4];
+  for (let b = 0; b < 4; b++) {
+    const bt = t + b * BEAT;
+    // kick: pitch-dropping sine
+    const ko = AC.createOscillator(), kg = AC.createGain();
+    ko.type = 'sine';
+    ko.frequency.setValueAtTime(140, bt);
+    ko.frequency.exponentialRampToValueAtTime(45, bt + 0.11);
+    kg.gain.setValueAtTime(0.42, bt);
+    kg.gain.exponentialRampToValueAtTime(0.001, bt + 0.14);
+    ko.connect(kg); kg.connect(musicBus); ko.start(bt); ko.stop(bt + 0.16);
+    // snare on 2 & 4
+    if (b === 1 || b === 3) sfxNoise(bt, 0.09, 1800, 0.09);
+    // hats on the offbeats
+    sfxNoise(bt + BEAT / 2, 0.03, 6500, 0.05);
+    // bass: root eighths, octave bounce
+    note(bt, ch.root * (b % 2 ? 2 : 1), 0.16, 'sawtooth', 0.16, musicBus, 420);
+    note(bt + BEAT / 2, ch.root, 0.14, 'sawtooth', 0.12, musicBus, 380);
+  }
+  // pad: soft chord for the whole bar
+  for (const f of ch.pad) note(t, f, BAR * 0.95, 'sawtooth', 0.028, musicBus, 900);
+  // sparkle arp through the echo, every other bar
+  if (bar % 2 === 0) {
+    for (let i = 0; i < 4; i++) {
+      note(t + i * BEAT / 2, ch.pad[i % 3] * 2, 0.09, 'square', 0.045, delaySend);
+    }
+  }
+}
+function sfxNoise(t, dur, freq, vol) {
+  const src = AC.createBufferSource();
+  const n = (AC.sampleRate * dur) | 0;
+  const buf = AC.createBuffer(1, n, AC.sampleRate);
+  const dd = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = freq > 3000 ? 'highpass' : 'bandpass'; f.frequency.value = freq;
+  const g = AC.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(musicBus);
+  src.start(t);
+}
+function musicStep() {
+  if (!AC || !started || AC.state !== 'running') return;
+  if (musicNext === 0) musicNext = AC.currentTime + 0.1;
+  while (musicNext < AC.currentTime + 0.6) {
+    scheduleBar(musicNext, musicBar);
+    musicBar++;
+    musicNext += BAR;
+  }
+}
+function sfx(freq, dur, type, vol, slide) {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+  o.type = type || 'square'; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+  g.gain.setValueAtTime(vol || 0.15, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+function bankSfx(n) {
+  if (!AC) return;
+  const notes = [523, 659, 784, 1046, 1318];
+  for (let i = 0; i < Math.min(n + 2, 5); i++) {
+    setTimeout(() => sfx(notes[i], 0.12, 'square', 0.14), i * 70);
+  }
+}
+function crashSfx() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource();
+  const len = AC.sampleRate * 0.35 | 0;
+  const nb = AC.createBuffer(1, len, AC.sampleRate);
+  const d = nb.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  src.buffer = nb;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+  const g = AC.createGain(); g.gain.value = 0.5;
+  src.connect(lp); lp.connect(g); g.connect(master); src.start(t);
+  sfx(70, 0.25, 'sine', 0.4, -40);
+}
+
+// ================================================================
+//  TRICKS & SCORE
+// ================================================================
+const el = {};
+['score','hi','speed','combo-tricks','combo-pts','popup','balance','bal-needle','hint','title','touch',
+ 'timer','stance','results','res-score','res-best','res-medals','res-stats','res-goals',
+ 'goals','goalpop','paused','bs-name','bs-blurb','bs-stats','bs-prev','bs-next','res-bike'
+].forEach(id => el[id] = document.getElementById(id));
+el.goals.textContent = 'GOALS ' + goalCount() + '/' + GOALS.length;
+
+// ---- the garage: swap bikes on the title screen and between runs ----
+// The stat bars are derived from the same multipliers the physics reads, so a
+// bike can never claim something it doesn't actually do.
+const BSTATS = [['SPD', b => (b.acc + b.top) / 2], ['SPIN', b => b.spin],
+                ['POP', b => b.hop], ['GRIP', b => (b.bal + b.brake) / 2]];
+function pips(v) {
+  const n = clamp(Math.round(3 + (v - 1) * 5), 1, 5);
+  return '<span class="on">' + '▰'.repeat(n) + '</span><span class="off">' + '▱'.repeat(5 - n) + '</span>';
+}
+function updateBikeUI() {
+  el['bs-name'].textContent = BS.name;
+  el['bs-blurb'].textContent = BS.blurb;
+  el['bs-stats'].innerHTML = BSTATS.map(s => '<span><i>' + s[0] + '</i>' + pips(s[1](BS)) + '</span>').join('');
+  el['res-bike'].innerHTML = '<span class="bs-arrow" data-d="-1">&#9668;</span> <b>' + BS.name +
+    '</b> <span class="bs-arrow" data-d="1">&#9658;</span> &nbsp; &larr; &rarr; TO SWAP BIKES';
+}
+// the results-screen arrows are rewritten on every swap, so delegate the tap
+el['res-bike'].addEventListener('pointerdown', e => {
+  const d = e.target.getAttribute && e.target.getAttribute('data-d');
+  if (d) { e.stopPropagation(); e.preventDefault(); selectBike(bikeIdx + (+d)); }
+});
+let browseT = 0;
+function selectBike(i) {
+  bikeIdx = (i + BIKES.length) % BIKES.length;
+  BS = BIKES[bikeIdx];
+  buildRig(BS);
+  try { localStorage.setItem('endo_bike', BS.id); } catch (e) {}
+  updateBikeUI();
+  browseT = 2.6;
+  el.title.classList.add('browsing');
+  sfx(520, 0.06, 'square', 0.13, 260);
+}
+updateBikeUI();
+let popupT = 0;
+function popup(text, cls) {
+  el.popup.textContent = text;
+  el.popup.className = 'thps' + (cls ? ' ' + cls : '');
+  void el.popup.offsetWidth;
+  el.popup.className += ' show';
+}
+// `name` stays raw so the anchored SPECIALS regexes keep matching; `disp` is what
+// the HUD shows, so pulling a trick switch reads as SW <trick> and pays 25% more.
+// swCtx pins the stance an air trick is judged in to the stance you LEFT the
+// ground in — a 180 flips you, and it shouldn't retroactively rename itself.
+let swCtx = null;
+function addTrick(name, pts, sp) {
+  const sw = (swCtx === null ? bk.fakie : swCtx) && !sp && name !== 'FAKIE';
+  if (sw) pts = Math.round(pts * 1.25);
+  combo.chain.push({ name: name, disp: (sw ? 'SW ' : '') + name, pts: pts, sp: !!sp, used: false });
+  combo.pts += pts;
+  combo.bankT = 0;
+  sfx(880 + combo.chain.length * 110, 0.08, 'square', 0.12);
+  if (sp) completeGoal('special');
+  else checkSpecials();
+}
+// ---- signature lines: sequences inside one combo become named ★ specials ----
+// matched as in-order subsequences (other tricks may land in between), each
+// base trick spends itself on one special so lines don't double-count
+const SPECIALS = [
+  ['FRONT WHEEL FANDANGO', 600, [/^(HOP|AIR) (180|360)$/, /^POGO$/, /^(ENDO|STOPPIE|PIVOT)/]],
+  ['POGO CIRCUS', 450, [/^POGO$/, /^POGO$/, /^POGO$/]],
+  ['HALF CAB', 500, [/^(HOP|AIR) 180$/, /^FAKIE$/, /^(HOP|AIR) 180$/]],
+  ['SWITCH HITTER', 500, [/^PIVOT/, /^FAKIE$/, /^PIVOT/]],
+  ['NOSE PLANT SPINNER', 350, [/^(HOP|AIR) (180|360)$/, /^(ENDO|STOPPIE)$/]],
+  ['MANUAL WEAVE', 400, [/WHEELIE$/, /^(AIR|BIG AIR|HOP 180|HOP 360)$/, /WHEELIE$/]],
+  ['GAP SNAP', 450, [/^(AIR|HOP) (180|360)$/, /^KICKER GAP$/]],
+  ['SPINE CYCLONE', 500, [/^SPINE AIR$/, /^AIR (180|360)$/]],
+  ['STAIR WIZARD', 450, [/^STAIR GAP$/, /^(AIR|HOP) (180|360)$/]],
+  ['PIPE DRAGON', 550, [/^PIPE AIR$/, /^(AIR|HOP) (180|360)$/]],
+  ['SKYLINE RUNNER', 700, [/^ROOF DROP$/, /^ROOF GAP$/]]
+];
+function checkSpecials() {
+  for (const sp of SPECIALS) {
+    let si = 0;
+    const hit = [];
+    for (const e of combo.chain) {
+      if (e.sp || e.used) continue;
+      if (sp[2][si].test(e.name)) { hit.push(e); if (++si === sp[2].length) break; }
+    }
+    if (si === sp[2].length) {
+      for (const e of hit) e.used = true;
+      addTrick('★ ' + sp[0], sp[1], true);
+      popup('★ ' + sp[0] + '  +' + sp[1], 'sp');
+      if (AC) [659, 880, 1108, 1568].forEach((f, i) => setTimeout(() => sfx(f, 0.1, 'square', 0.12), i * 60));
+      return;
+    }
+  }
+}
+function pivotName(deg) {
+  if (deg >= 660) return 'PIVOT 720';
+  if (deg >= 480) return 'PIVOT 540';
+  if (deg >= 310) return 'PIVOT 360';
+  if (deg >= 140) return 'PIVOT 180';
+  return 'PIVOT 90';
+}
+function endWheelie() {
+  if (!curWheelie) return;
+  if (curWheelie.t > 0.35) {
+    const long = curWheelie.t > 3;
+    addTrick(long ? 'LONG WHEELIE' : 'WHEELIE', Math.round(curWheelie.t * 110) + (long ? 200 : 0));
+  }
+  curWheelie = null;
+}
+function endEndo() {
+  if (!curEndo) return;
+  if (curEndo.t > 0.3) {
+    addTrick(curEndo.v0 > 6.5 ? 'STOPPIE' : 'ENDO', Math.round(curEndo.t * 130) + (curEndo.v0 > 6.5 ? 100 : 0));
+    if (curEndo.deg >= 55) addTrick(pivotName(curEndo.deg), Math.round(curEndo.deg * 3));
+    if (curEndo.deg >= 310) completeGoal('pivot360');
+  }
+  curEndo = null;
+}
+function bank() {
+  const mult = Math.min(combo.chain.length, 8);
+  const total = combo.pts * mult;
+  score += total;
+  runStats.bestCombo = Math.max(runStats.bestCombo, total);
+  if (total >= 5000) completeGoal('combo5k');
+  if (total > bestCombo) {
+    bestCombo = total;
+    try { localStorage.setItem('endo_best', String(bestCombo)); } catch (e) {}
+  }
+  // no centre-screen popup for a bank — the combo line already reads out the
+  // points down the bottom, so the payoff is a thump on the score counter
+  el.score.classList.remove('bank');
+  void el.score.offsetWidth;
+  el.score.classList.add('bank');
+  bankSfx(mult);
+  combo.chain.length = 0; combo.pts = 0; combo.bankT = 0;
+}
+function bail() {
+  endWheelie(); endEndo();
+  if (combo.chain.length) popup('BAILED!', 'bad');
+  combo.chain.length = 0; combo.pts = 0; combo.bankT = 0;
+}
+function airLaunched() { endWheelie(); endEndo(); }
+function onRoof(x, z) {
+  return z > DEPOT.z0 && z < DEPOT.z1 && x > DEPOT.x0 && x < DEPOT.x1 && !(x > DEPOT.ax0 && x < DEPOT.ax1);
+}
+function zoneTricks(t) {
+  if (t < 0.3) return;
+  // made the depot: launched off the bank, over the kiosk, onto the roof
+  if (onRoof(bk.x, bk.z) && bk.takeZ < DEPOT.z0 && bk.takeY > 1.5) {
+    addTrick('ROOF DROP', 400 + Math.round((bk.z - DEPOT.z0) * 20));
+    if (bk.takeZ < 38.5) addTrick('KIOSK CLEAR', 200);
+    completeGoal('roof');
+    return;
+  }
+  // gapped the alley that splits the roof in two
+  if (onRoof(bk.x, bk.z) && onRoof(bk.takeX, bk.takeZ) &&
+      ((bk.takeX < DEPOT.ax0 && bk.x > DEPOT.ax1) || (bk.takeX > DEPOT.ax1 && bk.x < DEPOT.ax0))) {
+    addTrick('ROOF GAP', 300);
+    return;
+  }
+  // aired out of a quarter pipe: rose above the takeoff point on the transition
+  if (inPipe(bk.takeX, bk.takeZ) && bk.takeY > 0.8 && bk.peakY - bk.takeY > 0.3) {
+    addTrick('PIPE AIR', 200 + Math.round((bk.peakY - bk.takeY) * 120));
+    if (bk.peakY - bk.takeY > 1.2) completeGoal('qp');
+    return;
+  }
+  // launched from a high feature and put it back down on the flat
+  if (bk.takeY < 0.45 || bk.y > 0.25) return;
+  if (bk.takeX > SPINE.x0 - 0.5 && bk.takeX < SPINE.x1 + 0.5 && bk.takeZ > SPINE.z0 - 0.5 && bk.takeZ < SPINE.z1 + 0.5) {
+    addTrick('SPINE AIR', 180);
+    completeGoal('spine');
+  } else if (bk.takeX > TERR.x0 - 0.5 && bk.takeX < TERR.x1 + 0.5 && bk.takeZ > TERR.z0 - 0.5 && bk.takeZ < TERR.z1 + 0.7) {
+    addTrick('STAIR GAP', 220);
+    completeGoal('stairs');
+  }
+}
+function airLanded(t, deg) {
+  runStats.air = Math.max(runStats.air, t);
+  swCtx = bk.takeSw;
+  try { airTricks(t, deg); } finally { swCtx = null; }
+}
+function airTricks(t, deg) {
+  zoneTricks(t);
+  if (bk.hopAir) {
+    // plain hops are free; spinning one earns its name
+    if (deg >= 140) addTrick(deg >= 300 ? 'HOP 360' : 'HOP 180', Math.round(t * 150 + deg * 2.5));
+    return;
+  }
+  if (t > 0.35) {
+    let name = 'AIR';
+    if (deg >= 300) name = 'AIR 360'; else if (deg >= 140) name = 'AIR 180';
+    else if (t > 1.1) name = 'BIG AIR';
+    addTrick(name, Math.round(t * 200 + deg * 2));
+    if (bk.bankAir && t > 0.4) addTrick('BANK BLAST', 200);
+    // kicker gap: crossed the hole in the boulevard between the two ramps
+    const kx = Math.abs(bk.x) < KICK.x1 + 1.5 && Math.abs(bk.takeX) < KICK.x1 + 1.5;
+    if (kx && ((bk.takeZ < KICK.az1 + 0.5 && bk.z > KICK.bz0 - 0.5) || (bk.takeZ > KICK.bz0 - 0.5 && bk.z < KICK.az1 + 0.5))) {
+      addTrick('KICKER GAP', 250);
+      completeGoal('gap');
+    }
+  }
+}
+function finishRun() {
+  if (combo.chain.length) bank();
+  runOver = true;
+  if (score > bestRun) {
+    bestRun = score;
+    try { localStorage.setItem('endo_bestrun', String(bestRun)); } catch (e) {}
+  }
+  el['res-score'].textContent = Math.round(score).toLocaleString() + ' PTS';
+  el['res-best'].textContent = 'BEST RUN ' + bestRun.toLocaleString();
+  el['res-medals'].innerHTML = MEDALS.map(m =>
+    (score >= m[1] ? '<div><b>' + m[0] + '!</b> ' + m[1].toLocaleString() + '</div>'
+                   : '<div class="dim">' + m[0] + ' ' + m[1].toLocaleString() + '</div>')).join('');
+  el['res-stats'].textContent =
+    'BEST COMBO ' + runStats.bestCombo.toLocaleString() +
+    ' · CONES ' + runStats.cones +
+    ' · BUSHES ' + runStats.bushes +
+    ' · BIGGEST AIR ' + runStats.air.toFixed(1) + 's';
+  el['res-goals'].innerHTML = '<div>GOALS ' + goalCount() + '/' + GOALS.length + '</div><div class="rg-cols">' +
+    GOALS.map(g => goalsDone[g[0]]
+      ? '<div><b>✓ ' + g[1] + '</b></div>'
+      : '<div class="dim">◻ ' + g[1] + ' — ' + g[2] + '</div>').join('') + '</div>';
+  el.results.style.display = 'flex';
+}
+function newRun() {
+  score = 0; runT = RUN_LEN; runOver = false; graceT = 0;
+  runStats.bestCombo = 0; runStats.cones = 0; runStats.bushes = 0; runStats.air = 0;
+  paused = false;
+  el.paused.style.display = 'none';
+  if (AC && AC.state === 'suspended') AC.resume();
+  combo.chain.length = 0; combo.pts = 0; combo.bankT = 0;
+  curWheelie = null; curEndo = null; fakieT = 0; fakieDone = false;
+  for (const c of cones) { c.up = true; c.f = 0; c.t = 0; }
+  for (const b of softs) { b.up = true; b.t = 0; }
+  bk.x = SPAWN.x; bk.z = SPAWN.z; bk.h = SPAWN.h; bk.v = 0; bk.pitch = 0; bk.pitchVel = 0;
+  bk.air = false; bk.vy = 0; bk.y = groundH(SPAWN.x, SPAWN.z); bk.gp = 0; bk.gpArm = 0; bk.roll = 0; bk.yawVel = 0; bk.endoT = 0; bk.invuln = 0;
+  bk.sus = 0; bk.susVel = 0; bk.vPitch = 0; bk.sway = 0; bk.wob = 0; bk.crouch = 0;
+  bk.fakie = false; bk.twist = 0;
+  el.results.style.display = 'none';
+}
+function trickStep(dt) {
+  if (!started) return;
+  if (!runOver) {
+    runT -= dt;
+    if (runT <= 0) {
+      const active = combo.chain.length || curWheelie || curEndo || bk.air || bk.pitch !== 0 || bk.state === 'crash';
+      graceT += dt;
+      if (!active || graceT > 6) { finishRun(); return; }
+    }
+  }
+  if (bk.state === 'crash' || runOver) return;
+  // out on the ring road → JAYWALKER
+  const mn = Math.max(Math.abs(bk.x), Math.abs(bk.z));
+  if (!bk.air && bk.y < 0.5 && mn > 41 && mn < 49) completeGoal('street');   // on the road, not on the depot roof above it
+  if (bk.air) { combo.bankT = 0; return; }
+  // wheelie
+  if (bk.pitch < -0.12) {
+    if (!curWheelie) curWheelie = { t: 0 };
+    curWheelie.t += dt;
+    if (curWheelie.t >= 6) completeGoal('wheelie6');
+  } else if (curWheelie && bk.pitch >= -0.04) endWheelie();
+  // endo
+  if (bk.pitch > 0.12) {
+    if (!curEndo) curEndo = { t: 0, deg: 0, v0: Math.abs(bk.v) };
+    curEndo.t += dt;
+    curEndo.deg += Math.abs(bk.yawVel) * dt * 57.2958;
+  } else if (curEndo && bk.pitch <= 0.04) endEndo();
+  // switch: hold it for a beat and it counts
+  if (bk.fakie && bk.v > 0.6) {
+    fakieT += dt;
+    if (fakieT > 0.6 && !fakieDone) {
+      addTrick('FAKIE', 150);
+      fakieDone = true;
+      completeGoal('switch');
+    }
+  } else if (!bk.fakie) { fakieT = 0; fakieDone = false; }
+  // bank when riding clean
+  if (combo.chain.length && !curWheelie && !curEndo && bk.pitch === 0) {
+    combo.bankT += dt;
+    if (combo.bankT > 1.7) bank();
+  }
+}
+
+// ================================================================
+//  PHYSICS
+// ================================================================
+function crash(type) {
+  bk.state = 'crash'; bk.crashT = 0; bk.crashType = type;
+  const fwd = [Math.sin(bk.h), 0, Math.cos(bk.h)];
+  const launch = type === 'overbars' ? Math.max(3, Math.abs(bk.v)) : 1.5;
+  bk.ragP = [bk.x + fwd[0] * 0.4, bk.y + 1.1, bk.z + fwd[2] * 0.4];
+  bk.ragV = [fwd[0] * launch * (type === 'loopout' ? -0.4 : 0.9), 3.2, fwd[2] * launch * (type === 'loopout' ? -0.4 : 0.9)];
+  bk.ragR = 0;
+  shake = 1;
+  spawnDust(bk.x, bk.y + 0.3, bk.z, 16, DUST, 2.4, 0.7);
+  crashSfx();
+  bail();
+}
+function respawn() {
+  bk.state = 'ride'; bk.pitch = 0; bk.pitchVel = 0; bk.v = 0; bk.roll = 0; bk.yawVel = 0; bk.endoT = 0;
+  bk.air = false; bk.vy = 0; bk.fakie = false; bk.twist = 0;
+  bk.sus = 0; bk.susVel = 0; bk.vPitch = 0; bk.sway = 0; bk.wob = 0; bk.crouch = 0;
+  bk.invuln = 1.2;
+  const fwd = [Math.sin(bk.h), 0, Math.cos(bk.h)];
+  bk.x -= fwd[0] * 2.0; bk.z -= fwd[2] * 2.0;
+  bk.x = clamp(bk.x, -BOUND + 2, BOUND - 2);
+  bk.z = clamp(bk.z, -BOUND + 2, BOUND - 2);
+  let nudged = false;
+  for (const s of solids) {
+    const dx = bk.x - s[0], dz = bk.z - s[1], d = Math.hypot(dx, dz);
+    if (d < s[2] + 1.2) {
+      bk.x = s[0] + dx / (d || 1) * (s[2] + 1.3);
+      bk.z = s[1] + dz / (d || 1) * (s[2] + 1.3);
+      nudged = true;
+    }
+  }
+  // respawned by a wall or an obstacle? point the bike back toward the plaza
+  if (nudged || Math.abs(bk.x) > BOUND - 5 || Math.abs(bk.z) > BOUND - 5) {
+    bk.h = Math.atan2(-bk.x, -bk.z);
+  }
+}
+// glancing an obstacle: keep the tangential speed and steer the slide along
+// the face; only the closing component gets eaten (plus a soft rebound). A
+// brush-past costs nothing — no more sticking to things you barely touched.
+// Returns the closing speed so the caller can scale feedback / decide a crash.
+function deflect(nx, nz) {
+  const vx = Math.sin(bk.h) * bk.v, vz = Math.cos(bk.h) * bk.v;
+  const into = -(vx * nx + vz * nz);
+  if (into <= 0.25) return 0;
+  const frac = clamp(into / (Math.abs(bk.v) + 0.001), 0, 1);   // 1 = dead-on
+  const tx = vx + nx * into, tz = vz + nz * into;
+  if (Math.hypot(tx, tz) > 0.4) {
+    bk.h += clamp(wrapPi(Math.atan2(tx, tz) - Math.atan2(vx, vz)), -0.6, 0.6) * (1 - frac) * 0.8;
+  }
+  bk.v = bk.v * (1 - frac) - Math.sign(bk.v || 1) * into * 0.3;
+  return into;
+}
+function crashStep(dt) {
+  bk.crashT += dt;
+  bk.v *= Math.max(0, 1 - 3 * dt);
+  bk.sus *= Math.max(0, 1 - 4 * dt); bk.susVel = 0;
+  bk.wob *= Math.max(0, 1 - 6 * dt); bk.sway *= Math.max(0, 1 - 6 * dt); bk.vPitch *= Math.max(0, 1 - 6 * dt);
+  bk.x += Math.sin(bk.h) * bk.v * dt;
+  bk.z += Math.cos(bk.h) * bk.v * dt;
+  if (bk.crashType === 'overbars') bk.pitch = Math.min(bk.pitch + 4.5 * dt, 1.62);
+  else if (bk.crashType === 'loopout') bk.pitch = Math.max(bk.pitch - 4.5 * dt, -1.58);
+  else bk.roll = Math.min(bk.roll + 4 * dt, 1.35);
+  if (bk.crashType !== 'wall') bk.roll = Math.min(bk.roll + 1.2 * dt, 1.0);
+  // ragdoll rider
+  bk.y += (groundH(bk.x, bk.z) - bk.y) * Math.min(1, dt * 8);
+  bk.ragV[1] -= 12 * dt;
+  bk.ragP[0] += bk.ragV[0] * dt; bk.ragP[1] += bk.ragV[1] * dt; bk.ragP[2] += bk.ragV[2] * dt;
+  const ragFloor = groundH(bk.ragP[0], bk.ragP[2]) + 0.18;
+  if (bk.ragP[1] < ragFloor) { bk.ragP[1] = ragFloor; bk.ragV = [bk.ragV[0] * 0.5, 0, bk.ragV[2] * 0.5]; }
+  bk.ragR += dt * 7 * (bk.crashType === 'loopout' ? -1 : 1);
+  if (bk.crashT > 1.5) respawn();
+}
+
+function physStep(dt) {
+  if (!started) return;
+  if (bk.state === 'crash') { crashStep(dt); return; }
+  if (bk.invuln > 0) bk.invuln -= dt;
+
+  // steering: left arrow turns screen-left
+  const steerIn = runOver ? 0 : (input.left ? 1 : 0) - (input.right ? 1 : 0);
+  bk.steerVis += clamp(steerIn - bk.steerVis, -dt * 7, dt * 7);
+  const pedal = !runOver && input.pedal ? 1 : 0, brake = !runOver && input.brake ? 1 : 0, lean = !runOver && input.lean ? 1 : 0;
+
+  // hop presses buffer briefly, so one hit just before touchdown still fires
+  if (input.hop) { input.hop = false; if (!runOver) bk.hopBuf = 0.22; }
+  bk.hopBuf = Math.max(0, bk.hopBuf - dt);
+
+  // ---- stance ----
+  // Rolling properly backwards means you're now riding switch. Flipping the travel
+  // heading, negating v and toggling the flag together leave BOTH the rendered
+  // facing and the world velocity untouched, so this is an invisible book-keeping
+  // step — it just moves you into the frame where everything downstream works.
+  // The 0.9 threshold keeps a trackstand from flapping the stance.
+  if (!bk.air && bk.v < -0.9) {
+    bk.h = wrapPi(bk.h + Math.PI); bk.v = -bk.v; bk.fakie = !bk.fakie;
+  }
+  // S maps a travel-frame angle into the bike's own frame (and back)
+  let S = bk.fakie ? -1 : 1;
+
+  // ---- secondary motion: all visual, none of it feeds back into handling ----
+  // suspension spring — tires/fork compress on impacts, extend on takeoffs
+  bk.susVel += (-130 * bk.sus - 13 * bk.susVel) * dt;
+  bk.sus = clamp(bk.sus + bk.susVel * dt, -0.1, 0.06);
+  // rider crouch — tucked in the air, knees bent deep soaking up a landing
+  const crouchT = bk.air ? (bk.hopAir ? 0.5 : 0.32) : clamp(-bk.sus * 8, 0, 1) * 0.55;
+  bk.crouch += (crouchT - bk.crouch) * Math.min(1, dt * (bk.air ? 6 : 11));
+  // human micro-corrections — bars and body twitch while balancing a trick
+  // or crawling at trackstand speeds; steady riding is rock solid
+  bk.wobT += dt;
+  let wobAmp = 0;
+  if (!bk.air) {
+    if (Math.abs(bk.pitch) > 0.1) wobAmp = 0.45 + Math.min(Math.abs(bk.pitchVel) * 1.4, 0.9);
+    else if (Math.abs(bk.v) > 0.15 && Math.abs(bk.v) < 2.2) wobAmp = 0.4 * (1 - Math.abs(bk.v) / 2.2);
+  }
+  const wobTarget = (Math.sin(bk.wobT * 11.7) + 0.6 * Math.sin(bk.wobT * 7.3) + 0.4 * Math.sin(bk.wobT * 16.9)) * 0.05 * wobAmp;
+  bk.wob += (wobTarget - bk.wob) * Math.min(1, dt * 8);
+
+  // ---- airborne ----
+  if (bk.air) {
+    bk.airT += dt;
+    bk.vy -= 9.8 * dt;
+    bk.y += bk.vy * dt;
+    if (bk.y > bk.peakY) bk.peakY = bk.y;
+    bk.x += bk.wvx * dt; bk.z += bk.wvz * dt;
+    bk.h += steerIn * 3.6 * BS.spin * dt;
+    bk.airDeg += Math.abs(steerIn) * 3.6 * BS.spin * dt * 57.2958;
+    // a pogo holds its endo angle in the air; a normal air self-levels.
+    // classic stick feel: pedal/brake = nose down, lean back (↓) = nose up.
+    // attitude is clamped to what a rider can actually throw the bike to
+    if (bk.pogo) bk.pitch += (brake * 1.0 - lean * 1.0) * dt;
+    else bk.pitch = clamp(bk.pitch + (brake * 1.8 + pedal * 1.6 - lean * 2.2 - bk.pitch * 0.9) * dt, -0.72, 0.9);
+    bk.roll *= Math.max(0, 1 - 2 * dt);
+    bk.vPitch *= Math.max(0, 1 - 6 * dt);
+    bk.sway *= Math.max(0, 1 - 4 * dt);
+    bk.torsoRot += (0.28 - bk.torsoRot) * Math.min(1, dt * 6);
+    const alim = BOUND - 1.4;
+    if (Math.abs(bk.x) > alim) { bk.x = clamp(bk.x, -alim, alim); bk.wvx *= -0.3; }
+    if (Math.abs(bk.z) > alim) { bk.z = clamp(bk.z, -alim, alim); bk.wvz *= -0.3; }
+    const ghA = groundH(bk.x, bk.z);
+    // land when the LOW wheel touches, not the frame center — a nose- or
+    // tail-heavy bike hangs a wheel below the axle line by HALF·sin(pitch),
+    // and letting that wheel sink to center-height was the front-wheel clip
+    const wheelDrop = P.HALF * Math.abs(Math.sin(bk.pitch));
+    if (bk.y <= ghA || (bk.vy <= 0 && bk.y <= ghA + wheelDrop)) {
+      const vyImp = bk.vy;
+      bk.y = ghA; bk.air = false;
+      bk.susVel = clamp(bk.vy * 0.55, -3.2, 0);   // impact compresses the bike
+      // resolve the stance: the bike keeps the line it's pointed down, and whichever
+      // end of that line the momentum is going becomes the new travel heading. Spin a
+      // 180 and you ride away switch AT SPEED instead of trickling to a stop.
+      const wsp = Math.hypot(bk.wvx, bk.wvz);
+      if (wsp > 0.4) {
+        const velH = Math.atan2(bk.wvx, bk.wvz);
+        if (Math.abs(wrapPi(bk.h - velH)) > Math.PI / 2) {
+          bk.h = wrapPi(bk.h + Math.PI); bk.fakie = !bk.fakie; S = -S;
+        }
+      }
+      const fx = Math.sin(bk.h), fz = Math.cos(bk.h);
+      let gpL = Math.atan2(groundH(bk.x + fx * 0.45, bk.z + fz * 0.45) - groundH(bk.x - fx * 0.45, bk.z - fz * 0.45), 0.9);
+      // land right on a ledge (roof edge, alley lip) and the ±0.45m window straddles
+      // two surfaces and reports a cliff — but the wheel is sitting flat on the one
+      // underneath it. Outside the pipes, an unrideable slope here is that artifact.
+      if (Math.abs(gpL) > slopeLim(bk.x, bk.z) && !inPipe(bk.x, bk.z)) gpL = 0;
+      // landing grip: the tires bite and pull you onto the bike's line. Coming down
+      // off-axis scrubs, but never to the dead stop a sideways touchdown used to give
+      const off = wsp > 0.4 ? Math.abs(wrapPi(Math.atan2(bk.wvx, bk.wvz) - bk.h)) : 0;
+      bk.v = wsp * (0.45 + 0.55 * Math.cos(off));
+      const t = bk.airT, deg = bk.airDeg;
+      bk.gp = gpL; bk.vy = 0;
+      if (bk.pogo) {
+        // touched back down on the front wheel — endo carries on
+        bk.pogo = false;
+        spawnDust(bk.x + fx * 0.5, bk.y + 0.04, bk.z + fz * 0.5, 5, DUST, 1);
+        if (bk.pitch > 0.15 && bk.pitch < 1.1) {
+          addTrick('POGO', 120);
+          bk.pitchVel = 0;
+          sfx(250, 0.08, 'square', 0.2, 140);
+        } else { bk.pitch = 0; bk.pitchVel = 0; }
+        return;
+      }
+      // transition landing: coming down onto a steep quarter-pipe face — match
+      // the slope and convert the fall back into roll speed instead of slamming.
+      // Falling onto the up-slope ahead pushes you back down it (roll out fakie);
+      // dropping in facing down-slope converts the fall into forward speed.
+      // Pipe zones only: a vertical building wall is a step, not a transition, and
+      // treating one as rideable used to hoist you up the face and spit you back.
+      if (Math.abs(gpL) > 0.6 && inPipe(bk.x, bk.z)) {
+        bk.pitch = 0; bk.pitchVel = 0;
+        bk.v += vyImp * Math.sin(gpL) * 0.8;
+        spawnDust(bk.x, bk.y + 0.04, bk.z, 4, DUST, 0.9, 0.4);
+        airLanded(t, deg);
+        bk.hopAir = false; bk.bankAir = false;
+        return;
+      }
+      // rel = how far off flat-on-the-slope we touched down. pitch is in the bike's
+      // own frame and gpL is in the travel frame, so switch needs the S conversion
+      const rel = bk.pitch + S * gpL;
+      const diff = Math.abs(rel);
+      if (diff > 1.0 && bk.invuln <= 0) { bk.pitch = 0; bk.pitchVel = 0; crash(rel > 0 ? 'overbars' : 'loopout'); return; }
+      spawnDust(bk.x, bk.y + 0.04, bk.z, Math.min(14, 3 + Math.round(t * 6 + diff * 6)), DUST, 1.1, 0.5);
+      if (rel > 0.3 && rel < 0.92) {
+        // nose-first touchdown: ride it out on the front wheel
+        bk.pitch = rel; bk.pitchVel = 0;
+        shake = Math.max(shake, 0.15);
+        sfx(120, 0.08, 'sine', 0.22, -40);
+      } else if (rel < -0.3 && rel > -0.85) {
+        // rear-wheel touchdown: ride it out in a manual, seated inside the
+        // recoverable pocket
+        bk.pitch = clamp(rel, -0.55, -0.3); bk.pitchVel = 0;
+        shake = Math.max(shake, 0.15);
+        sfx(120, 0.08, 'sine', 0.22, -40);
+      } else {
+        bk.pitch = 0; bk.pitchVel = 0;
+        if (diff > 0.45 || t > 0.9) {
+          shake = Math.min(1, 0.3 + diff * 0.4);
+          bk.v *= 1 - clamp(diff * 0.4, 0, 0.5);
+          sfx(85, 0.12, 'sine', 0.35, -30);
+        }
+      }
+      airLanded(t, deg);
+      bk.hopAir = false; bk.bankAir = false;
+    }
+    bk.fSpin += (brake ? 0 : bk.v / WHEEL_R) * dt;
+    bk.rSpin += bk.rSpinVel * dt;
+    return;
+  }
+
+  // ---- grounded: sense the height field ----
+  const fwdx = Math.sin(bk.h), fwdz = Math.cos(bk.h);
+  const ghHere = groundH(bk.x, bk.z);
+  // forward-only slope: what the front wheel is about to meet. The symmetric
+  // sample can't tell a wall ahead from a ledge you just cleared behind you.
+  const gpF = Math.atan2(groundH(bk.x + fwdx * 0.45, bk.z + fwdz * 0.45) - ghHere, 0.45);
+  let gpNew = Math.atan2(groundH(bk.x + fwdx * 0.45, bk.z + fwdz * 0.45) - groundH(bk.x - fwdx * 0.45, bk.z - fwdz * 0.45), 0.9);
+  const slim = slopeLim(bk.x, bk.z);
+  // a step under either sample (roof edge, alley lip) reports a cliff the bike
+  // isn't actually on — trust the forward reading instead of the pair
+  if (Math.abs(gpNew) > slim) gpNew = clamp(gpF, -slim, slim);
+  // faces steeper than the local limit aren't rideable — bounce off, don't wall-crawl.
+  // (quarter-pipe zones allow near-vertical; everywhere else stays at ~43°)
+  if (gpF > slim + 0.03 && bk.v > 0.5) {
+    // ploughing a wall face at speed is a crash, not a polite bounce — this is what
+    // makes coming up short on the depot gap actually cost you
+    if (bk.v > 9 && bk.invuln <= 0) { crash('wall'); return; }
+    bk.v *= -0.3; shake = Math.max(shake, 0.25); sfx(90, 0.1, 'sine', 0.25, -30);
+  }
+  const gpClamped = clamp(gpNew, -slim, slim);
+  // cresting a convex lip at speed: momentum carries the bike off the ground
+  // (spine, pyramid, funbox edges, rollers at pace) instead of gluing to the backside
+  const crestGp = bk.gp;
+  const crest = bk.v > 5 && crestGp > 0.18 && gpClamped < crestGp - 0.22;
+  const gpOld = bk.gp;
+  bk.gp += (gpClamped - bk.gp) * Math.min(1, dt * 14);
+  // arm the true ramp angle for takeoff: near a lip the ±0.45m sampling window
+  // sees past the edge and collapses gp before the launch fires, which is why
+  // kicker jumps used to skim instead of popping. The armed value holds the
+  // pre-lip slope for a beat so launches leave at the angle you actually rode.
+  if (gpClamped >= bk.gp - 0.03) { bk.gpArm = Math.max(bk.gp, gpClamped); bk.armT = 0; }
+  else { bk.armT += dt; if (bk.armT > 0.3) bk.gpArm = bk.gp; }
+  // hitting a slope kink at speed loads the suspension (or unloads it rolling off)
+  bk.susVel -= (bk.gp - gpOld) * Math.max(bk.v, 0) * 0.55;
+  // stair treads clatter the wheels on the way down (or up)
+  if (hornT > 0) hornT -= dt;
+  if (bk.x > TERR.x0 && bk.x < TERR.x1 && bk.z >= TERR.z1 && bk.z <= TERR.z1 + TERR.ramp && Math.abs(bk.v) > 1) {
+    bk.stairAcc += Math.abs(bk.v) * dt;
+    if (bk.stairAcc > TERR.ramp / 5) {
+      bk.stairAcc = 0;
+      bk.susVel -= 0.5;
+      sfx(150 + Math.random() * 70, 0.035, 'sine', 0.16, -60);
+    }
+  }
+
+  const frontUp = bk.pitch < -0.05, rearUp = bk.pitch > 0.05;
+  const pedalEff = rearUp ? 0 : pedal;
+  const brakeEff = frontUp ? 0 : brake;
+
+  // longitudinal (gravity pulls you down slopes)
+  let a = pedalEff * P.ACC * BS.acc * Math.max(0, 1 - Math.max(bk.v, 0) / (P.VMAX * BS.top));
+  // drag sets the real terminal velocity, so a bike's top-end stat divides it
+  a -= (0.15 * bk.v + 0.007 * bk.v * Math.abs(bk.v)) / BS.top;
+  a -= 9.8 * Math.sin(bk.gp);
+  bk.v += a * dt;
+  let dec = 0;
+  if (brakeEff && Math.abs(bk.v) > 0.01) {
+    // a deep endo rides a skidding front tire: less stopping power, more slide
+    const grip = clamp(1 - Math.max(bk.pitch, 0) * 0.8, 0.35, 1);
+    dec = Math.min(P.BRAKE * BS.brake * grip, Math.abs(bk.v) / dt);
+    bk.v = Math.sign(bk.v) * Math.max(0, Math.abs(bk.v) - dec * dt);
+  }
+
+  // pitch torques. brake => nose-down (+pitch = rear wheel up) everywhere:
+  // grounded it endos you via weight transfer; mid-wheelie it's body english that saves you.
+  let tq = 0;
+  // supporting torques die off below the tipping point (a released pivot settles
+  // back down) and bleed out over ~7s so no endo lasts forever
+  if (bk.pitch > 0.05) bk.endoT += dt; else bk.endoT = Math.max(0, bk.endoT - dt * 3);
+  const stam = Math.max(0.2, 1 - bk.endoT / 7);
+  const fade = clamp(1 - bk.pitch / 1.0, 0, 1) * stam;
+  if (brake) {
+    if (frontUp) tq += P.BODY;
+    else {
+      // weight-transfer torque eases off as the rear rises (rider soaking it up),
+      // so a stoppie is holdable instead of an instant flip
+      // capped so a panic grab at top speed ramps the endo up instead of
+      // instantly catapulting you past the balance pocket.
+      // switch riding brakes the same way — the endo is the whole game, it doesn't
+      // get to stop working just because you're rolling backwards
+      tq += P.KB * Math.min(dec, 11) * clamp(1 - Math.max(bk.pitch, 0) / 1.1, 0, 1);
+      // leaning back means the rider stops soaking the front — no sustain
+      if (bk.pitch > 0.05 && !lean) tq += P.SUSTAIN * fade;
+    }
+  }
+  // power wheelie: only a committed mash lifts the front — pedal held for a
+  // beat, in the launch-speed window, and never while grabbing the brake
+  if (pedal && !rearUp) bk.pedalT += dt; else bk.pedalT = 0;
+  // matures at ~0.65s of held pedal: committed enough that the front stays
+  // plantable for endos, but inside the launch-speed window from a standing mash
+  const mash = clamp((bk.pedalT - 0.25) / 0.4, 0, 1);
+  if (!brake && bk.pitch > P.BALW) tq -= pedalEff * P.KW * mash * Math.min(Math.max(bk.v, 0) / 2, 1) * clamp(1 - bk.v / 13, 0, 1);
+  // body english: holding the pedal lifts a raised front wheel toward the balance
+  // point at any speed — but never shoves it past into a loop-out
+  if (frontUp && pedal && !brake && bk.pitch > P.BALW) tq -= 2.2;
+  // leaning back (↓) hauls your weight behind the rear axle — the bail-out
+  // from a deep endo, classic pull-back-to-recover
+  if (rearUp && lean) tq -= P.BODY * 1.4;
+  // leaning back while braking also resists the nose-over, so you can feather
+  // how hard a stoppie throws you forward
+  if (brake && !rearUp) tq -= lean * P.LEANT * 0.6;
+  // spinning on the front wheel slings the rear outward-up: committing to a
+  // pivot keeps the endo alive after the brake has scrubbed all the speed
+  if (bk.pitch > 0.05) tq += Math.min(0.4 * bk.yawVel * bk.yawVel, 3.2) * fade;
+  const tqIn = tq;
+  if (Math.abs(bk.pitch) > 0.004) {
+    const bal = bk.pitch > 0 ? P.BALE : P.BALW;
+    const A_ = bk.pitch > 0 ? P.AE : P.AW;
+    tq += A_ * Math.sin(bk.pitch - bal);
+    // let go of the pedal and a wheelie comes down promptly instead of lingering
+    if (bk.pitch < 0 && !pedal) tq += 1.5;
+    tq -= (bk.pitch < 0 ? 3.2 : P.DAMP) * bk.pitchVel;
+    // training wheels for balance: holding the trick key (brake in an endo,
+    // pedal in a wheelie) auto-steadies you inside a pocket around the sweet spot.
+    // As endo stamina fades the pocket's center sinks, so a tired endo settles
+    // back down instead of tipping over the bars.
+    // assist drops the moment you signal exit: brake in a wheelie,
+    // lean-back (bail) in an endo
+    const hold = bk.pitch > 0 ? (brake && !lean) : (pedal && !brake);
+    const balA = bal - (bk.pitch > 0 ? 0.18 * (1 - stam) : 0);
+    const off = bk.pitch - balA;
+    // a bike's BAL stat both widens the pocket and stiffens the correction —
+    // the trials mule parks in an endo, the hornet makes you actually ride it
+    const aw = P.ASSIST_W * BS.bal;
+    if (hold && Math.abs(off) < aw) {
+      tq -= P.ASSIST * BS.bal * (bk.pitch > 0 ? 1.35 * Math.max(0.45, stam) : 1) * off * (1 - Math.abs(off) / aw);
+      // soak up rotation momentum inside the pocket so you can't blast through it
+      tq -= 8.5 * bk.pitchVel;
+    }
+  }
+
+  const prev = bk.pitch;
+  if (prev === 0 && Math.abs(tqIn) < P.LIFT) {
+    bk.pitchVel = 0;
+  } else {
+    bk.pitchVel += tq * dt;
+    bk.pitch += bk.pitchVel * dt;
+  }
+  // touch down: crossing zero, or settling near it with nothing holding you up
+  const crossed = prev !== 0 && (prev > 0) !== (bk.pitch > 0);
+  const settled = prev !== 0 && Math.abs(bk.pitch) < 0.02 && Math.abs(bk.pitchVel) < 0.5 && Math.abs(tqIn) < P.LIFT;
+  if (crossed || settled) {
+    if (Math.abs(bk.pitchVel) > 4.5) {
+      shake = Math.min(1, Math.abs(bk.pitchVel) * 0.14);
+      bk.v *= 0.88;
+      bk.susVel -= Math.min(Math.abs(bk.pitchVel) * 0.16, 1.4);
+      sfx(85, 0.12, 'sine', 0.35, -30);
+    } else if (Math.abs(prev) > 0.1) {
+      bk.susVel -= 0.35;
+      sfx(120, 0.06, 'sine', 0.15, -40);
+    }
+    bk.pitch = 0; bk.pitchVel = 0;
+  }
+  if (bk.pitch > P.CRE) { crash('overbars'); return; }
+  if (bk.pitch < P.CRW) { crash('loopout'); return; }
+
+  // steering / position
+  const fwd = [Math.sin(bk.h), Math.cos(bk.h)];
+  if (bk.pitch > 0.12) {
+    // PIVOT: rear wheel airborne, rotate the whole bike around the front contact patch
+    const rate = bk.steerVis * (1.7 + 2.9 * Math.min(bk.pitch / 0.6, 1)) * BS.spin;
+    bk.yawVel += (rate - bk.yawVel) * Math.min(1, dt * 10);
+    // the front wheel is behind you in travel terms when you're switch, so the
+    // contact patch we spin around is S*HALF up the travel axis
+    let fcx = bk.x + fwd[0] * P.HALF * S, fcz = bk.z + fwd[1] * P.HALF * S;
+    bk.h += bk.yawVel * dt;
+    const nf = [Math.sin(bk.h), Math.cos(bk.h)];
+    fcx += nf[0] * bk.v * dt; fcz += nf[1] * bk.v * dt;
+    bk.x = fcx - nf[0] * P.HALF * S; bk.z = fcz - nf[1] * P.HALF * S;
+    bk.v *= Math.max(0, 1 - 0.45 * dt);
+    bk.curYaw = bk.yawVel;
+    const onFlat = bk.y < 0.05 && Math.abs(bk.gp) < 0.06;
+    if (onFlat && Math.abs(bk.yawVel) > 0.7) {
+      addMark(fcx, fcz, bk.h + Math.PI / 2, 0.09, 0.028);
+      if (Math.random() < dt * 22) spawnDust(fcx, 0.05, fcz, 1, DUST, 0.9, 0.15);
+    } else if (onFlat && Math.abs(bk.v) > 1) {
+      addMark(fcx, fcz, bk.h, Math.abs(bk.v) * dt * 0.6, 0.028);
+      if (Math.random() < dt * 14) spawnDust(fcx, 0.05, fcz, 1, DUST, 0.8, 0.15);
+    }
+  } else {
+    bk.yawVel *= Math.max(0, 1 - 8 * dt);
+    const steerA = bk.steerVis * 0.5 / (1 + Math.abs(bk.v) * 0.09);
+    let yr = bk.v / P.L * Math.tan(steerA);
+    if (bk.pitch < -0.05) yr = yr * 0.35 + bk.steerVis * 0.5;
+    yr = clamp(yr, -2.4, 2.4);
+    bk.curYaw = yr;
+    bk.h += yr * dt;
+    bk.x += Math.sin(bk.h) * bk.v * dt;
+    bk.z += Math.cos(bk.h) * bk.v * dt;
+    if (brakeEff && Math.abs(bk.v) > 3.5 && bk.y < 0.05 && Math.abs(bk.gp) < 0.06) {
+      addMark(bk.x + Math.sin(bk.h) * P.HALF * S, bk.z + Math.cos(bk.h) * P.HALF * S, bk.h, Math.abs(bk.v) * dt * 0.6, 0.024);
+    }
+  }
+  bk.h = wrapPi(bk.h);
+
+  // visual roll: lean into the turn
+  const rollT = bk.pitch > 0.12 ? bk.yawVel * 0.1 : clamp(-0.055 * bk.curYaw * bk.v, -0.45, 0.45);
+  bk.roll += (rollT - bk.roll) * Math.min(1, dt * 6);
+
+  // walls (the building line) — grazing along it slides, plowing into it hurts
+  const lim = BOUND - 0.6;
+  if (Math.abs(bk.x) > lim || Math.abs(bk.z) > lim) {
+    let nx = Math.abs(bk.x) > lim ? -Math.sign(bk.x) : 0;
+    let nz = Math.abs(bk.z) > lim ? -Math.sign(bk.z) : 0;
+    const nl = Math.hypot(nx, nz); nx /= nl; nz /= nl;
+    bk.x = clamp(bk.x, -lim, lim); bk.z = clamp(bk.z, -lim, lim);
+    const into = deflect(nx, nz);
+    if (into > 9 && bk.invuln <= 0) { crash('wall'); return; }
+    if (into > 1.5) {
+      shake = Math.max(shake, Math.min(0.35, into * 0.04));
+      bk.susVel -= Math.min(0.8, into * 0.1);
+      spawnDust(bk.x + fwdx * 0.5, bk.y + 0.25, bk.z + fwdz * 0.5, 4, DUST, 1.2);
+      sfx(95, 0.09, 'square', 0.2, -50);
+    }
+  }
+  // solid obstacles
+  for (const s of solids) {
+    const dx = bk.x - s[0], dz = bk.z - s[1], d = Math.hypot(dx, dz);
+    if (d < s[2] + 0.35) {
+      const nx = dx / (d || 1), nz = dz / (d || 1);
+      bk.x = s[0] + nx * (s[2] + 0.36);
+      bk.z = s[1] + nz * (s[2] + 0.36);
+      const into = deflect(nx, nz);
+      if (into > 8.5 && bk.invuln <= 0) { crash('wall'); return; }
+      if (into > 1.5) {
+        shake = Math.max(shake, Math.min(0.35, into * 0.04));
+        bk.susVel -= Math.min(0.8, into * 0.1);
+        spawnDust(bk.x + fwdx * 0.5, bk.y + 0.25, bk.z + fwdz * 0.5, 4, DUST, 1.2);
+        if (s[3] === 'car' && hornT <= 0) {   // clipped a parked car: horn + alarm chirp
+          hornT = 1.6;
+          sfx(392, 0.22, 'square', 0.2);
+          sfx(494, 0.22, 'square', 0.2);
+          if (AC) setTimeout(() => { sfx(1244, 0.07, 'square', 0.12); sfx(1244, 0.07, 'square', 0.12); }, 320);
+        } else {
+          sfx(95, 0.09, 'square', 0.2, -50);
+        }
+      }
+    }
+  }
+  // cones
+  for (const c of cones) {
+    if (!c.up) continue;
+    if (Math.hypot(bk.x - c.x, bk.z - c.z) < 0.55) {
+      c.up = false; c.t = 0; c.yaw = bk.h + (rnd() - 0.5);
+      // punt it: the cone flies off along the direction of travel and skitters out
+      c.vx = Math.sin(bk.h) * bk.v * 0.8 + (rnd() - 0.5) * 2;
+      c.vz = Math.cos(bk.h) * bk.v * 0.8 + (rnd() - 0.5) * 2;
+      c.spin = (rnd() - 0.5) * 12;
+      bk.susVel -= 0.25;   // the bars feel the thump
+      addTrick('CONE', 40);
+      runStats.cones++;
+      if (runStats.cones >= 8) completeGoal('cones8');
+      spawnDust(c.x, c.gy + 0.25, c.z, 7, DUST_CONE, 1.8);
+      sfx(160, 0.09, 'square', 0.2, -80);
+    }
+  }
+  // bushes & trash bags: soft — you blast straight through and they burst
+  for (const b of softs) {
+    if (!b.up || bk.y - b.gy > 1.1) continue;
+    if (Math.hypot(bk.x - b.x, bk.z - b.z) < (b.type === 'bush' ? 0.8 : 0.55)) {
+      b.up = false; b.t = 0;
+      const leaf = b.type === 'bush';
+      spawnDust(b.x, b.gy + 0.45, b.z, leaf ? 16 : 12, leaf ? LEAF_A : TRASH_A, 2.6, 0.5, 1.5);
+      spawnDust(b.x, b.gy + 0.2, b.z, 8, leaf ? LEAF_B : [0.2, 0.2, 0.26], 1.6, 0.4, 1.2);
+      addTrick(leaf ? 'BUSH WHACK' : 'TRASHED', leaf ? 60 : 50);
+      runStats.bushes++;
+      bk.susVel -= 0.2;
+      sfx(90, 0.08, 'square', 0.16, -60);
+      sfx(2400, 0.16, 'sawtooth', 0.05, -1900);
+    }
+  }
+
+  // bunny hop: pop both wheels off the ground.
+  // Mid-endo it's a POGO — bouncing on the front wheel without dropping the trick.
+  if (bk.hopBuf > 0) {
+    bk.hopBuf = 0;
+    if (!runOver && bk.pitch > 0.18 && bk.pitch < 0.95) {
+      bk.air = true; bk.airT = 0; bk.airDeg = 0; bk.pogo = true;
+      bk.vy = 2.9 * BS.hop;
+      bk.wvx = Math.sin(bk.h) * bk.v; bk.wvz = Math.cos(bk.h) * bk.v;
+      bk.takeX = bk.x; bk.takeZ = bk.z; bk.takeY = bk.y; bk.peakY = bk.y; bk.takeSw = bk.fakie;
+      bk.pitchVel = 0;
+      bk.susVel = 1.2;
+      spawnDust(bk.x + Math.sin(bk.h) * 0.5 * S, bk.y + 0.04, bk.z + Math.cos(bk.h) * 0.5 * S, 4, DUST, 1);
+      sfx(300, 0.1, 'square', 0.18, 220);
+      return;
+    }
+    if (!runOver && Math.abs(bk.pitch) < 0.6) {
+      bk.air = true; bk.airT = 0; bk.airDeg = 0; bk.hopAir = true; bk.bankAir = false;
+      bk.vy = (3.4 + Math.abs(bk.v) * 0.08) * BS.hop;
+      bk.wvx = Math.sin(bk.h) * bk.v; bk.wvz = Math.cos(bk.h) * bk.v;
+      bk.takeX = bk.x; bk.takeZ = bk.z; bk.takeY = bk.y; bk.peakY = bk.y; bk.takeSw = bk.fakie;
+      bk.pitch = clamp(bk.pitch - S * bk.gp, -1.0, 1.0) - 0.12;
+      bk.pitchVel = 0;
+      bk.susVel = 1.4;
+      airLaunched();
+      spawnDust(bk.x, bk.y + 0.03, bk.z, 4, DUST, 1.4);
+      sfx(180, 0.12, 'square', 0.18, 260);
+      return;
+    }
+  }
+
+  // ride the height field; go airborne when the ground drops away (kicker
+  // lips, deck edges) or momentum launches you off a crest. The crest arms on
+  // the slope-break but only fires once the ground stops rising underneath —
+  // launching early would just re-plant the bike on the remaining upslope
+  const ghNew = groundH(bk.x, bk.z);
+  if (ghNew < bk.y - 0.22 || (crest && ghNew <= bk.y + 0.001)) {
+    // leave at the armed ramp angle, not the lip-contaminated sample
+    const gpT = crest ? Math.max(crestGp, bk.gpArm) : Math.max(bk.gp, bk.gpArm);
+    bk.air = true; bk.airT = 0; bk.airDeg = 0;
+    bk.vy = crest ? bk.v * Math.sin(gpT) * 0.85 : Math.max(bk.v * Math.sin(gpT), -1);
+    bk.wvx = Math.sin(bk.h) * bk.v; bk.wvz = Math.cos(bk.h) * bk.v;
+    bk.takeX = bk.x; bk.takeZ = bk.z; bk.takeY = bk.y; bk.peakY = bk.y; bk.takeSw = bk.fakie;
+    bk.hopAir = false;
+    bk.bankAir = bk.y > 2 && bk.z > 30;
+    // carry the slope angle into free-flight pitch (nose-up off an upslope)
+    bk.pitch = clamp(bk.pitch - S * gpT, -1.0, 1.0);
+    bk.pitchVel = 0;
+    bk.susVel = 0.9;
+    airLaunched();
+  } else {
+    bk.y = ghNew;
+  }
+
+  // wheels & cranks
+  const wRate = bk.v / WHEEL_R;
+  bk.fSpin += (brake ? 0 : wRate) * dt;            // front locks under THE brake
+  if (!rearUp) bk.rSpinVel = wRate;
+  else bk.rSpinVel *= Math.max(0, 1 - 0.25 * dt);  // free-spinning rear mid-endo
+  bk.rSpin += bk.rSpinVel * dt;
+  // cranks lead the wheel when winding up from a stop — never frozen mid-stroke
+  if (pedalEff && bk.v > -0.5) bk.crank += clamp(Math.abs(wRate) * 0.42, 1.7, 7) * dt;
+
+  // rider pose: hang off the back of the seat in a wheelie, brace up over the bars in an endo
+  const wdP = clamp(-bk.pitch / 0.7, 0, 1), edP = clamp(bk.pitch / 0.7, 0, 1);
+  const poseT = clamp(bk.pitch * 0.5 + edP * 0.3 - wdP * 0.35 - lean * 0.3 + (brake && bk.pitch > 0.1 ? 0.15 : 0), -1.0, 0.85);
+  bk.torsoRot += (poseT - bk.torsoRot) * Math.min(1, dt * 8);
+  // riding switch, the rider twists round to look where they're actually going
+  bk.twist += ((bk.fakie ? 0.62 : 0) - bk.twist) * Math.min(1, dt * 5);
+  bk.bob = 0.045 * Math.max(0, Math.sin(bk.crank * 2)) * pedalEff * clamp(1 - Math.abs(bk.v) / 7, 0, 1);
+  // weight transfer you can see: fork dive under braking, rear squat under a
+  // committed mash — and an out-of-saddle sway rocking the bike each stroke
+  const vpT = clamp(dec * 0.016, 0, 0.075) * clamp(1 - Math.abs(bk.pitch) / 0.15, 0, 1)
+            - mash * 0.04 * clamp(1 - Math.abs(bk.v) / 9, 0, 1);
+  bk.vPitch += (vpT - bk.vPitch) * Math.min(1, dt * 9);
+  const swayT = Math.sin(bk.crank) * 0.085 * pedalEff * clamp(1 - Math.abs(bk.v) / 8, 0, 1);
+  bk.sway += (swayT - bk.sway) * Math.min(1, dt * 10);
+}
+
+// ================================================================
+//  INPUT
+// ================================================================
+const KEYMAP = {
+  ArrowUp: 'pedal', KeyW: 'pedal',
+  ArrowDown: 'lean', KeyS: 'lean',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
+  Space: 'brake'
+};
+function start() {
+  if (started) return;
+  started = true;
+  initAudio();
+  el.title.style.display = 'none';
+}
+const BIKE_KEY = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
+addEventListener('keydown', e => {
+  if (e.code in KEYMAP || e.code === 'Space') e.preventDefault();
+  // on the title screen and the results screen, ←/→ browse the garage rather
+  // than steering — it's the only time you're allowed to change bikes
+  if ((!started || runOver) && e.code in BIKE_KEY) {
+    if (!e.repeat) selectBike(bikeIdx + BIKE_KEY[e.code]);
+    return;
+  }
+  start();
+  if (e.repeat) return;
+  // results screen: any of the obvious keys starts the next run
+  if (runOver && (e.code === 'KeyR' || e.code === 'Space' || e.code === 'Enter')) { newRun(); return; }
+  if (e.code in KEYMAP) input[KEYMAP[e.code]] = true;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyX') input.hop = true;
+  if (e.code === 'KeyR') {
+    if (bk.state === 'ride') {
+      bail(); bk.v = 0; bk.pitch = 0; bk.pitchVel = 0; bk.x = SPAWN.x; bk.z = SPAWN.z; bk.h = SPAWN.h;
+      bk.air = false; bk.vy = 0; bk.y = groundH(SPAWN.x, SPAWN.z); bk.gp = 0; bk.gpArm = 0;
+      bk.fakie = false; bk.twist = 0;
+    }
+  }
+  if (e.code === 'KeyM') { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.5; }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (started && !runOver) {
+      paused = !paused;
+      el.paused.style.display = paused ? 'flex' : 'none';
+      if (AC) { if (paused) AC.suspend(); else AC.resume(); }
+    }
+  }
+});
+addEventListener('keyup', e => { if (e.code in KEYMAP) input[KEYMAP[e.code]] = false; });
+addEventListener('pointerdown', start);
+// the title arrows are clickable too — stop the tap from also dropping you in
+for (const a of [['bs-prev', -1], ['bs-next', 1]]) {
+  el[a[0]].addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); selectBike(bikeIdx + a[1]); });
+}
+
+// touch controls
+if ('ontouchstart' in window) {
+  el.touch.style.display = 'block';
+  const map = { tL: 'left', tR: 'right', tB: 'brake', tP: 'pedal', tW: 'lean', tH: 'hop' };
+  for (const id in map) {
+    const d = document.getElementById(id);
+    const on = e => { e.preventDefault(); start(); input[map[id]] = true; d.classList.add('held'); };
+    const off = e => { e.preventDefault(); input[map[id]] = false; d.classList.remove('held'); };
+    d.addEventListener('touchstart', on); d.addEventListener('touchend', off); d.addEventListener('touchcancel', off);
+  }
+}
+
+// ================================================================
+//  CAMERA & RENDER
+// ================================================================
+let camH = 0, camPos = [6, 1.8, -26], tSim = 0, clickAcc = 0, fovCur = 65;
+
+function render(dt) {
+  tSim += dt;
+  // camera
+  if (!started) {
+    // showroom orbit — close in and looking down, which parks the bike in the
+    // lower third of the frame, clear of the title text above it
+    camH = tSim * 0.35;
+    const r = 4.1;
+    camPos = [bk.x - Math.sin(camH) * r, 2.45, bk.z - Math.cos(camH) * r];
+  } else {
+    // bk.h IS the direction of travel in both stances, so the camera just sits
+    // behind it and never swings — ride away switch and the world stays put,
+    // it's the bike that's turned around
+    const targetH = bk.h;
+    // chase slower mid-pivot so the spin reads as the bike rotating, not the world
+    const chase = bk.pitch > 0.12 ? 1.9 : 3.6;
+    camH += wrapPi(targetH - camH) * Math.min(1, dt * chase);
+    const cd = 4.3 + Math.abs(bk.v) * 0.07;
+    const tx = bk.x - Math.sin(camH) * cd, tz = bk.z - Math.cos(camH) * cd;
+    const k = Math.min(1, dt * 8);
+    camPos[0] += (tx - camPos[0]) * k;
+    camPos[1] += (bk.y + 1.78 - camPos[1]) * k;
+    camPos[2] += (tz - camPos[2]) * k;
+    camPos[0] = clamp(camPos[0], -51.8, 51.8);
+    camPos[2] = clamp(camPos[2], -51.8, 51.8);
+    camPos[1] = Math.max(camPos[1], groundH(camPos[0], camPos[2]) + 0.7);
+  }
+  shake = Math.max(0, shake - dt * 2.2);
+  const shx = (Math.random() - 0.5) * shake * 0.3, shy = (Math.random() - 0.5) * shake * 0.3;
+  const eye = [camPos[0] + shx, camPos[1] + shy, camPos[2]];
+  const tgt = [bk.x + Math.sin(camH) * 1.1,
+               bk.y + 0.95 + bk.pitch * 0.25 + shy + (started ? 0 : 1.15),
+               bk.z + Math.cos(camH) * 1.1];
+  const view = m4LookAt(eye, tgt, [0, 1, 0]);
+  // speed widens the lens
+  const fovT = 65 + Math.min(Math.abs(bk.v), 16) * 0.8 + (bk.air ? 4 : 0);
+  fovCur += (fovT - fovCur) * Math.min(1, dt * 3);
+  const proj = m4Persp(fovCur * Math.PI / 180, RW / RH, 0.1, 600);
+  const vp = m4Mul(proj, view);
+
+  gl.viewport(0, 0, RW, RH);
+  gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+
+  // sky
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(skyProg);
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
+  gl.enableVertexAttribArray(skyA);
+  gl.vertexAttribPointer(skyA, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform3fv(SU.uTop, SKY_TOP);
+  gl.uniform3fv(SU.uHor, SKY_HOR);
+  const rel = wrapPi(SUN_AZ - camH);
+  gl.uniform2f(SU.uSun, 0.5 - rel * 0.52, 0.30);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.disableVertexAttribArray(skyA);
+  gl.enable(gl.DEPTH_TEST);
+
+  // scene
+  gl.useProgram(prog);
+  gl.enableVertexAttribArray(A.aP);
+  gl.enableVertexAttribArray(A.aN);
+  gl.enableVertexAttribArray(A.aC);
+  gl.uniformMatrix4fv(U.uVP, false, vp);
+  gl.uniform3fv(U.uL, LIGHT);
+  gl.uniform3f(U.uEye, eye[0], eye[1], eye[2]);
+  gl.uniform3fv(U.uFogCol, FOG_COL);
+
+  drawMesh(mtsMesh, IDENT, 0.72, 1, 0);
+  drawMesh(bldMesh, IDENT, 0.95, 1, 0.06);
+  drawMesh(worldMesh, IDENT);
+  if (marksDirty) rebuildMarks();
+  if (marksN) drawMesh({ buf: marksBuf, n: marksN }, IDENT, 1, 1, 0);
+
+  // cones
+  for (const c of cones) {
+    if (!c.up) {
+      c.t += dt;
+      c.f = Math.min(1, c.f + dt * 5);
+      // skitter across the ground, spinning, until friction wins
+      if (Math.abs(c.vx) > 0.05 || Math.abs(c.vz) > 0.05) {
+        c.x = clamp(c.x + c.vx * dt, -51.5, 51.5);
+        c.z = clamp(c.z + c.vz * dt, -51.5, 51.5);
+        c.yaw += c.spin * dt;
+        const drag = Math.max(0, 1 - 2.8 * dt);
+        c.vx *= drag; c.vz *= drag; c.spin *= drag;
+        c.gy = groundH(c.x, c.z);
+      }
+      // don't pop back up underneath the bike
+      if (c.t > 12 && Math.hypot(bk.x - c.x, bk.z - c.z) > 2.5) { c.up = true; c.f = 0; c.vx = 0; c.vz = 0; c.spin = 0; }
+    }
+    let m = m4T(c.x, c.gy, c.z);
+    if (c.f > 0) m = chain(m, m4RY(c.yaw), m4T(0, 0, 0.26), m4RX(-c.f * 1.45), m4T(0, 0, -0.26));
+    drawMesh(coneMesh, m);
+  }
+
+  // bushes & trash bags grow back after a while, never under the bike
+  for (const b of softs) {
+    if (!b.up) {
+      b.t += dt;
+      if (b.t > 15 && Math.hypot(bk.x - b.x, bk.z - b.z) > 3) b.up = true;
+      continue;
+    }
+    drawMesh(b.type === 'bush' ? bushMeshes[b.m] : bagMesh, chain(m4T(b.x, b.gy, b.z), m4RY(b.yaw)));
+  }
+
+  // bike
+  const blink = bk.invuln > 0 && Math.floor(tSim * 14) % 2 === 0;
+  // the bike points backwards down the travel line when you're switch. bk.gp is a
+  // travel-frame slope so it needs flipping into the bike's frame; bk.vPitch (fork
+  // dive) is already bike-frame and stays as it is.
+  const fh = bk.h + (bk.fakie ? Math.PI : 0), Sr = bk.fakie ? -1 : 1;
+  if (!blink) {
+    const pivotZ = bk.air ? 0 : bk.pitch >= 0 ? P.HALF : -P.HALF;
+    const bikeM = chain(
+      m4T(bk.x, bk.y + bk.sus * 0.7, bk.z), m4RY(fh), m4RZ(Sr * bk.roll + bk.sway + bk.wob * 0.5),
+      m4RX((bk.air ? 0 : -Sr * bk.gp) + bk.vPitch),
+      m4T(0, 0, pivotZ), m4RX(bk.pitch), m4T(0, 0, -pivotZ)
+    );
+    const forkM = chain(bikeM, m4T(HEAD[0], HEAD[1], HEAD[2]), m4RY(bk.steerVis * 0.55 + bk.wob * 1.3));
+    const fWheelM = chain(forkM, m4T(AXLE_F_REL[0], AXLE_F_REL[1], AXLE_F_REL[2]), m4RX(bk.fSpin));
+    const rWheelM = chain(bikeM, m4T(0, 0.34, -0.53), m4RX(bk.rSpin));
+
+    drawMesh(frameMesh, bikeM, 1, 1, 0.45);
+    drawMesh(forkMesh, forkM, 1, 1, 0.6);
+    drawMesh(tireMesh, fWheelM, 1, 1, 0.04);
+    drawMesh(tireMesh, rWheelM, 1, 1, 0.04);
+    drawMesh(hubMesh, fWheelM, 1, 1, 0.4);
+    drawMesh(hubMesh, rWheelM, 1, 1, 0.4);
+
+    let torsoM;
+    if (bk.state === 'crash') {
+      torsoM = chain(m4T(bk.ragP[0], bk.ragP[1], bk.ragP[2]), m4RY(fh), m4RX(bk.ragR));
+    } else {
+      // hips leave the saddle: back and low in a wheelie, up and braced in an endo.
+      // crouch tucks the body in the air and soaks up landings; the torso
+      // counter-leans so the rider stays more upright than the bike in a corner
+      const wd = clamp(-bk.pitch / 0.7, 0, 1), ed = clamp(bk.pitch / 0.7, 0, 1);
+      const absorb = Math.max(-bk.sus, 0);
+      torsoM = chain(bikeM,
+        m4T(0, 1.05 - 0.07 * wd + 0.1 * ed + bk.bob - bk.crouch * 0.16 - absorb * 1.1,
+            -0.35 - 0.24 * wd - 0.16 * ed - bk.crouch * 0.05),
+        m4RZ(-(Sr * bk.roll + bk.sway) * 0.45 - bk.wob),
+        m4RX(bk.torsoRot + bk.crouch * 0.3), m4RY(bk.twist));
+    }
+    drawMesh(torsoMesh, torsoM, 1, 1, 0.2);
+
+    // dynamic limbs
+    const dyn = new MB();
+    if (bk.state !== 'crash') {
+      const gripL = applyM(forkM, [-GRIP[0], GRIP[1], GRIP[2]]);
+      const gripR = applyM(forkM, [GRIP[0], GRIP[1], GRIP[2]]);
+      // the shoulders shrug up into a crouch or a landing absorb, and lead a
+      // little toward the grips so turning the bars carries the whole yoke
+      const shrug = bk.crouch * 0.022 + Math.max(-bk.sus, 0) * 0.06;
+      const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      const shL = mix(applyM(torsoM, [-0.168, 0.452 + shrug, 0.048]), gripL, 0.06);
+      const shR = mix(applyM(torsoM, [0.168, 0.452 + shrug, 0.048]), gripR, 0.06);
+      // elbows: arms stay bent, flaring out and down as the rider crouches
+      const rtv = [Math.cos(fh), 0, -Math.sin(fh)];
+      const bend = 0.05 + bk.crouch * 0.13 + Math.max(-bk.sus, 0) * 0.6 + clamp(bk.pitch / 0.7, 0, 1) * 0.05;
+      for (const arm of [[-1, shL, gripL], [1, shR, gripR]]) {
+        const elb = [
+          (arm[1][0] + arm[2][0]) / 2 + rtv[0] * arm[0] * (0.05 + bend * 0.4),
+          (arm[1][1] + arm[2][1]) / 2 - bend,
+          (arm[1][2] + arm[2][2]) / 2 + rtv[2] * arm[0] * (0.05 + bend * 0.4)
+        ];
+        // deltoid: a capsule that lies ALONG the upper arm and tucks back into
+        // the shoulder yoke, so the shoulder rolls with the arm instead of
+        // being a block bolted to the torso
+        const ad = vNorm(vSub(elb, arm[1]));
+        const din = [arm[1][0] - ad[0] * 0.062, arm[1][1] - ad[1] * 0.062, arm[1][2] - ad[2] * 0.062];
+        const dout = [arm[1][0] + ad[0] * 0.085, arm[1][1] + ad[1] * 0.085, arm[1][2] + ad[2] * 0.085];
+        dyn.limb(din, dout, 0.062, 0.052, COL_SHIRT);
+        dyn.limb(dout, elb, 0.048, 0.035, COL_SHIRT);     // upper arm
+        dyn.limb(elb, arm[2], 0.034, 0.029, COL_SHIRT);   // forearm
+        // elbow pad + gloved hand wrapped around the grip
+        dyn.orb(elb[0], elb[1], elb[2], 0.043, 0.043, 0.043, 8, 5, [0.16, 0.15, 0.2]);
+        dyn.limb([arm[2][0] - rtv[0] * arm[0] * 0.02, arm[2][1], arm[2][2] - rtv[2] * arm[0] * 0.02],
+                 [arm[2][0] + rtv[0] * arm[0] * 0.05, arm[2][1], arm[2][2] + rtv[2] * arm[0] * 0.05], 0.033, 0.031, COL_SKIN);
+      }
+      const hipL = applyM(torsoM, [-0.1, 0.0, 0]);
+      const hipR = applyM(torsoM, [0.1, 0.0, 0]);
+      const fwd3 = [Math.sin(fh), 0, Math.cos(fh)];
+      for (const side of [-1, 1]) {
+        const ca = bk.crank + (side < 0 ? Math.PI : 0);
+        const pedalL = applyM(bikeM, [side * 0.11, 0.34 + Math.cos(ca) * 0.16, -0.02 - Math.sin(ca) * 0.16]);
+        const hip = side < 0 ? hipL : hipR;
+        const knee = [
+          (hip[0] + pedalL[0]) / 2 + fwd3[0] * 0.17,
+          (hip[1] + pedalL[1]) / 2 + 0.06,
+          (hip[2] + pedalL[2]) / 2 + fwd3[2] * 0.17
+        ];
+        dyn.limb(hip, knee, 0.064, 0.044, COL_PANTS);    // thigh tapers to the knee
+        dyn.limb(knee, pedalL, 0.044, 0.031, COL_PANTS); // calf tapers to the ankle
+        const crankC = applyM(bikeM, [side * 0.07, 0.34, -0.02]);
+        dyn.bar(crankC, pedalL, 0.018, [0.15, 0.15, 0.18]);
+        // knee pad + sneaker planted on the pedal
+        dyn.orb(knee[0], knee[1], knee[2], 0.052, 0.052, 0.052, 8, 5, [0.16, 0.15, 0.2]);
+        dyn.limb([pedalL[0] - fwd3[0] * 0.07, pedalL[1] + 0.035, pedalL[2] - fwd3[2] * 0.07],
+                 [pedalL[0] + fwd3[0] * 0.13, pedalL[1] + 0.03, pedalL[2] + fwd3[2] * 0.13], 0.042, 0.038, [0.14, 0.12, 0.16]);
+      }
+    } else {
+      // flailing limbs on the ragdoll
+      const t = bk.crashT * 18;
+      for (let i = 0; i < 4; i++) {
+        const a = applyM(torsoM, [(i % 2 ? 0.14 : -0.14), i < 2 ? 0.42 : 0, 0.02]);
+        const b = [
+          a[0] + Math.sin(t + i * 2) * 0.3, Math.max(0.05, a[1] - 0.25 + Math.cos(t + i) * 0.15), a[2] + Math.cos(t + i * 1.7) * 0.3
+        ];
+        dyn.limb(a, b, i < 2 ? 0.055 : 0.062, i < 2 ? 0.03 : 0.038, i < 2 ? COL_SHIRT : COL_PANTS);
+      }
+    }
+    const dynData = new Float32Array(dyn.a);
+    gl.bindBuffer(gl.ARRAY_BUFFER, dynBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, dynData, gl.DYNAMIC_DRAW);
+    drawMesh({ buf: dynBuf, n: dynData.length / 9 }, IDENT, 1, 1, 0.15);
+
+    // shadow
+    gl.enable(gl.BLEND);
+    gl.depthMask(false);
+    const shOff = bk.pitch > 0 ? 0.35 * Math.min(bk.pitch / 0.6, 1) : bk.pitch < 0 ? -0.35 * Math.min(-bk.pitch / 0.6, 1) : 0;
+    const fwds = [Math.sin(fh), Math.cos(fh)];
+    const shX = bk.x + fwds[0] * shOff, shZ = bk.z + fwds[1] * shOff;
+    const shG = groundH(shX, shZ);
+    const shM = chain(m4T(shX, shG + 0.013, shZ), m4RY(fh));
+    drawMesh(shadowMesh, shM, 1, 0.32 * clamp(1 - (bk.y - shG) / 3.5, 0.12, 1), 0);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+  }
+
+  drawParticles(dt, camH);
+
+  // audio: skid, wind, freewheel, music
+  if (skidGain) {
+    let target = 0;
+    if (bk.state === 'ride' && !bk.air) {
+      if (bk.pitch > 0.12 && (Math.abs(bk.yawVel) > 0.5 || Math.abs(bk.v) > 1.5)) {
+        target = Math.min(0.32, Math.abs(bk.yawVel) * 0.1 + Math.abs(bk.v) * 0.02);
+      } else if (input.brake && Math.abs(bk.v) > 3 && bk.pitch >= -0.05) {
+        target = Math.min(0.22, Math.abs(bk.v) * 0.02);
+      }
+    }
+    skidGain.gain.setTargetAtTime(target, AC.currentTime, 0.05);
+    windGain.gain.setTargetAtTime(
+      clamp((Math.abs(bk.v) - 5) / 14, 0, 1) * 0.1 + (bk.air ? 0.05 : 0), AC.currentTime, 0.12);
+    if (!input.pedal && !bk.air && Math.abs(bk.v) > 1.5 && bk.state === 'ride') {
+      clickAcc += Math.abs(bk.v) * dt * 1.6;
+      if (clickAcc >= 1) { clickAcc = 0; sfx(4200, 0.014, 'square', 0.035); }
+    }
+    musicStep();
+  }
+}
+
+// ================================================================
+//  HUD
+// ================================================================
+const hud = { score: -1, hi: -1, speed: -1, tricks: '', pts: '', timer: '', low: false, fakie: null };
+function hudStep(dt) {
+  if (hintT > 0 && started) { hintT -= dt; if (hintT <= 0) el.hint.style.opacity = '0'; }
+  if (browseT > 0) { browseT -= dt; if (browseT <= 0) el.title.classList.remove('browsing'); }
+  const tt = Math.max(0, Math.ceil(runT));
+  const tstr = Math.floor(tt / 60) + ':' + String(tt % 60).padStart(2, '0');
+  if (tstr !== hud.timer) { hud.timer = tstr; el.timer.textContent = tstr; }
+  const low = started && !runOver && runT < 10.5;
+  if (low !== hud.low) { hud.low = low; el.timer.className = 'thps' + (low ? ' low' : ''); }
+  const s = Math.round(score);
+  if (s !== hud.score) { hud.score = s; el.score.textContent = s.toLocaleString(); }
+  if (bestCombo !== hud.hi) { hud.hi = bestCombo; el.hi.textContent = 'BEST COMBO ' + bestCombo.toLocaleString(); }
+  const sp = Math.round(Math.abs(bk.v) * 3.6);
+  if (sp !== hud.speed) { hud.speed = sp; el.speed.firstChild.nodeValue = sp; }
+  if (bk.fakie !== hud.fakie) { hud.fakie = bk.fakie; el.stance.className = 'thps' + (bk.fakie ? ' on' : ''); }
+
+  // combo line — ★ specials pop gold inside the white chain
+  let names = combo.chain.map(t => t.sp ? '<span class="sp">' + t.disp + '</span>' : t.disp);
+  let live = 0;
+  if (curWheelie && curWheelie.t > 0.35) { names.push('WHEELIE'); live += curWheelie.t * 110; }
+  if (curEndo && curEndo.t > 0.3) {
+    names.push(curEndo.v0 > 6.5 ? 'STOPPIE' : 'ENDO'); live += curEndo.t * 130;
+    if (curEndo.deg >= 55) { names.push(pivotName(curEndo.deg)); live += curEndo.deg * 3; }
+  }
+  // long chains only ever show their tail, so the list can't creep up the screen
+  const mult = Math.min(names.length, 8);
+  const tStr = names.length > 4
+    ? '<span class="more">+' + (names.length - 4) + ' MORE + </span>' + names.slice(-4).join(' + ')
+    : names.join(' + ');
+  if (tStr !== hud.tricks) { hud.tricks = tStr; el['combo-tricks'].innerHTML = tStr; }
+  const pStr = names.length ? Math.round(combo.pts + live).toLocaleString() + (mult > 1 ? '  x  ' + mult : '') : '';
+  if (pStr !== hud.pts) { hud.pts = pStr; el['combo-pts'].textContent = pStr; }
+
+  // balance meter
+  if (bk.state === 'ride' && !bk.air && Math.abs(bk.pitch) > 0.1) {
+    el.balance.classList.add('on');
+    const bal = bk.pitch > 0 ? P.BALE : P.BALW;
+    const range = bk.pitch > 0 ? P.CRE - P.BALE : P.BALW - P.CRW;
+    const n = clamp((bk.pitch - bal) / range, -1, 1);
+    el['bal-needle'].style.left = (50 + n * 46) + '%';
+  } else {
+    el.balance.classList.remove('on');
+  }
+}
+
+// ================================================================
+//  LAYOUT & LOOP
+// ================================================================
+const wrap = document.getElementById('wrap');
+const hudEl = document.getElementById('hud');
+function resize() {
+  const w = wrap.clientWidth || innerWidth, h = wrap.clientHeight || innerHeight;
+  const scale = Math.min(w / RW, h / RH);
+  const cw = Math.round(RW * scale), ch = Math.round(RH * scale);
+  const left = Math.round((w - cw) / 2), top = Math.round((h - ch) / 2);
+  for (const e2 of [cv, hudEl]) {
+    e2.style.left = left + 'px'; e2.style.top = top + 'px';
+    e2.style.width = cw + 'px'; e2.style.height = ch + 'px';
+  }
+  hudEl.style.fontSize = (ch * 0.052) + 'px';
+}
+addEventListener('resize', resize);
+resize();
+
+const STEP = 1 / 120;
+let last = performance.now(), acc = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  if (paused) return;
+  acc += dt;
+  while (acc >= STEP) { physStep(STEP); trickStep(STEP); acc -= STEP; }
+  render(dt);
+  hudStep(dt);
+}
+requestAnimationFrame(frame);
+
+// debug hook for automated checks
+window.__endo = { bk: bk, input: input, comboState: combo, get score() { return score; },
+  get runT() { return runT; }, set runT(v) { runT = v; },
+  get runOver() { return runOver; }, get paused() { return paused; },
+  get parts() { return parts.length; }, get musicBar() { return musicBar; },
+  get camH() { return camH; },
+  goalsDone: goalsDone, runStats: runStats, start: start, newRun: newRun, groundH: groundH,
+  BEDS: BEDS, solids: solids, softs: softs, cones: cones,
+  BIKES: BIKES, selectBike: selectBike, get bike() { return BS; }, get bikeIdx() { return bikeIdx; },
+  MAP: { KICK: KICK, BANK: BANK, TERR: TERR, PYR: PYR, SPINE: SPINE, ROLL: ROLL, FUN: FUN,
+         DEPOT: DEPOT, EQP: EQP, HPIPE: HPIPE, SPAWN: SPAWN, LANE_W: LANE_W } };
+</script>

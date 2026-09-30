@@ -1,0 +1,4 @@
+# playwright lives in a session scratchpad and is symlinked in — never commit it
+tests/node_modules
+node_modules
+.DS_Store
