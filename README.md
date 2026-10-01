@@ -3,7 +3,7 @@
 A front-brake BMX freestyle game. Hand-rolled WebGL, no libraries, no build step —
 the whole game is one file: [`index.html`](index.html).
 
-**Play it: https://alecsharpie.github.io/endo/**
+**Play it: https://www.alecsharpie.me/endo/**
 
 ## Controls
 

@@ -25,6 +25,15 @@ const finite = v => typeof v === 'number' && Number.isFinite(v);
   const pump = async n => { for (let i = 0; i < n; i++) {
     await key('pedal', true); await wait(400);
     await key('pedal', false); await wait(120); } };
+  // the south ring road: 60m of flat, empty tarmac. The spawn is on the terrace
+  // deck, so anything that rides from it unguided ends up somewhere on the stairs
+  // — fine for the motion checks, fatal for anything that asserts on airtime.
+  // Reset state/crashT/y too: a leftover crash kills every later check.
+  const flat = () => page.evaluate(() => { const b = window.__endo.bk;
+    b.x = -30; b.z = -44; b.h = Math.PI / 2; b.v = 0; b.pitch = 0; b.pitchVel = 0;
+    b.air = false; b.vy = 0; b.fakie = false; b.roll = 0; b.yawVel = 0; b.gp = 0; b.gpArm = 0;
+    b.state = 'ride'; b.crashT = 0; b.invuln = 0;
+    b.y = window.__endo.groundH(-30, -44); });
   const results = [];
   const check = (name, cond, detail) => results.push([cond ? 'PASS' : 'FAIL', name, detail]);
 
@@ -55,7 +64,9 @@ const finite = v => typeof v === 'number' && Number.isFinite(v);
   check('balance wobble alive', wobRange > 0.001, 'range=' + wobRange.toFixed(4));
   await key('brake', false); await key('lean', true); await wait(500); await key('lean', false); // bail out
 
-  // 4. hop: suspension pops then lands compressed; crouch tucks in air
+  // 4. hop: suspension pops then lands compressed; crouch tucks in air.
+  // Airtime assertions need known ground under the wheels, so start from flat.
+  await flat();
   await pump(2);
   await page.evaluate(() => { window.__endo.input.hop = true; });
   await wait(120);
