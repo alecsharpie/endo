@@ -23,6 +23,9 @@ bonuses. 2:00 on the clock; ride out clean to bank the combo.
 Pick a bike with `←` `→` on the title screen or between runs — six of them, each with its
 own speed, spin, pop and balance.
 
+On a phone it plays in landscape with on-screen pads; turn the phone and it picks the run
+back up where it paused.
+
 ## The map
 
 Four runs that each chain three or more features and spit you back into the open hub:

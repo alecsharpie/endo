@@ -1,7 +1,24 @@
 <meta charset="utf-8">
 <title>ENDO! · Front Brake Freestyle</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.92em%22 font-size=%2292%22>%F0%9F%9A%B2</text></svg>">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="A front-brake BMX freestyle game in one file of hand-rolled WebGL. Endo, pivot, pogo and gap your way around a neon plaza against a two-minute clock.">
+<meta name="theme-color" content="#0b0714">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ENDO!">
+<meta property="og:title" content="ENDO! — Front Brake Freestyle">
+<meta property="og:description" content="A front-brake BMX freestyle game in one file of hand-rolled WebGL. Endo, pivot, pogo and gap your way around a neon plaza against a two-minute clock.">
+<meta property="og:url" content="https://www.alecsharpie.me/endo/">
+<meta property="og:image" content="https://www.alecsharpie.me/endo/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ENDO! — Front Brake Freestyle">
+<meta name="twitter:description" content="A front-brake BMX freestyle game in one file of hand-rolled WebGL. Two minutes, one brake.">
+<meta name="twitter:image" content="https://www.alecsharpie.me/endo/og.jpg">
 <style>
   html, body { margin: 0; padding: 0; background: #0b0714; overflow: hidden; height: 100%; }
   #wrap { position: fixed; inset: 0; background: #0b0714; }
@@ -27,6 +44,15 @@
       -2px  2px 0 #14041c, 2px  2px 0 #14041c,
        0 3px 0 #14041c;
   }
+  /* The live HUD belongs to the run, not to the title screen — the clock used to
+     sit right across the wordmark. #hud.run goes on the moment you drop in,
+     #hud.over when the results panel takes over. (#balance and #stance aren't in
+     the .run list: they already gate themselves on their own .on classes.) */
+  #scorebox, #speed, #timer, #combo { opacity: 0; transition: opacity 0.35s; }
+  #hud.run #scorebox, #hud.run #speed, #hud.run #timer, #hud.run #combo { opacity: 1; }
+  /* the results panel repeats every number the HUD is showing — clear the deck */
+  #hud.over #scorebox, #hud.over #speed, #hud.over #timer, #hud.over #combo,
+  #hud.over #stance, #hud.over #balance { opacity: 0; }
   #scorebox { position: absolute; top: 3%; left: 3.5%; transform: skewX(-6deg); }
   #score { font-size: 2.1em; color: #ffd91c; line-height: 1; transform-origin: left center; }
   #score.bank { animation: bankpop 0.55s ease-out; }
@@ -94,10 +120,23 @@
   #res-goals .dim { opacity: 0.5; }
   #paused {
     position: absolute; inset: 0; display: none;
-    align-items: center; justify-content: center;
+    flex-direction: column; align-items: center; justify-content: center;
     background: rgba(10, 4, 24, 0.4);
     font-size: 2.4em; color: #fff;
   }
+  #paused .press {
+    font-size: 0.26em; color: #ffd7f0; margin-top: 0.9em;
+    font-family: "Arial Narrow", Arial, sans-serif; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; font-style: normal;
+  }
+  /* muting is otherwise invisible — easy to leave it off and wonder where the
+     music went two runs later */
+  #mute {
+    position: absolute; top: 3%; right: 3.5%; font-size: 0.6em; color: #ff9b2e;
+    transform: skewX(-6deg); opacity: 0; transition: opacity 0.25s;
+  }
+  #hud.run #mute { top: 11.5%; }
+  #mute.on { opacity: 0.9; }
   #timer {
     position: absolute; top: 3%; left: 50%;
     transform: translateX(-50%) skewX(-6deg);
@@ -107,14 +146,30 @@
   #results {
     position: absolute; inset: 0; display: none;
     flex-direction: column; align-items: center; justify-content: center;
-    background: rgba(10, 4, 24, 0.55); text-align: center;
+    background: rgba(10, 4, 24, 0.72); text-align: center;
+    animation: resin 0.4s ease-out;
+  }
+  @keyframes resin {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
   }
   #results h2 {
     margin: 0 0 0.2em; font-size: 1.9em; font-style: italic; font-weight: 900;
     color: #ffd91c; transform: skewX(-8deg) rotate(-2deg);
+    animation: reshead 0.5s ease-out;
+  }
+  @keyframes reshead {
+    0%  { transform: skewX(-8deg) rotate(-2deg) scale(1.5); opacity: 0; }
+    55% { transform: skewX(-8deg) rotate(-2deg) scale(0.96); opacity: 1; }
+    100%{ transform: skewX(-8deg) rotate(-2deg) scale(1); }
   }
   #res-score { font-size: 1.35em; color: #fff; }
   #res-best { font-size: 0.7em; color: #ffb3d1; margin-top: 0.3em; }
+  #res-new {
+    font-size: 0.8em; color: #38e07d; margin-top: 0.25em; display: none;
+    animation: blink 0.9s steps(2) infinite;
+  }
+  #res-new.on { display: block; }
   #res-medals {
     font-size: 0.62em; color: #cfa9ff; margin-top: 0.6em; line-height: 1.3;
     display: flex; gap: 1.8em; justify-content: center;
@@ -131,14 +186,26 @@
     transition: opacity 1s;
   }
   /* the title's own control list says it all — the in-run reminder would just
-     collide with PRESS ANY KEY */
-  #hud:has(#title) #hint { opacity: 0; }
+     collide with PRESS ANY KEY, so it only fades up once you've dropped in */
+  #hint { opacity: 0; }
+  #hud.run #hint { opacity: 1; }
+  #hud.over #hint { opacity: 0; }   /* after .run, so the results screen wins */
   #title {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: rgba(10, 4, 24, 0.45);
     text-align: center;
+    transition: opacity 0.3s ease-out;
   }
+  /* drop-in crossfade: the title dissolves as the HUD fades up */
+  #title.gone { opacity: 0; }
+  /* a red rim on the hard ones — the shake alone reads as a bump */
+  #flash {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(255,40,70,0) 38%, rgba(255,40,70,0.6) 100%);
+  }
+  #flash.on { animation: crashflash 0.55s ease-out; }
+  @keyframes crashflash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
   #title h1 {
     margin: 0; font-size: 4.1em; font-style: italic; font-weight: 900;
     transform: skewX(-8deg) rotate(-2deg);
@@ -149,9 +216,15 @@
     line-height: 0.95;
   }
   #title .sub {
-    font-size: 0.85em; color: #9ff2ff; margin: 0.45em 0 0.85em;
+    font-size: 0.85em; color: #9ff2ff; margin: 0.45em 0 0.3em;
     transform: skewX(-6deg);
   }
+  /* come back to it and the title remembers what you did last time */
+  #t-stats {
+    font-size: 0.52em; color: #ffb3d1; margin: 0 0 0.7em;
+    transform: skewX(-6deg); letter-spacing: 0.06em; min-height: 1em;
+  }
+  #t-stats b { color: #ffd91c; }
   #title .ctl {
     font-family: "Arial Narrow", Arial, sans-serif; font-weight: 700;
     font-size: 0.58em; line-height: 1.6; color: #ffd7f0;
@@ -196,19 +269,49 @@
   #res-bike b { color: #ffd91c; }
   #res-bike .bs-arrow { font-size: 0.9em; }
   @keyframes blink { 50% { opacity: 0.15; } }
-  #touch { position: absolute; inset: 0; display: none; pointer-events: none; }
-  #touch div {
-    position: absolute; bottom: 4%; pointer-events: auto;
-    width: 3.4em; height: 3.4em; border-radius: 50%;
-    background: rgba(255, 255, 255, 0.10); border: 2px solid rgba(255, 255, 255, 0.35);
-    color: #fff; font-size: 1em; display: flex; align-items: center; justify-content: center;
-    font-weight: 900; text-shadow: 0 2px 0 #14041c;
+  /* the pads live on the VIEWPORT, not on the letterboxed canvas — on a phone the
+     canvas is pillarboxed and the controls would sit a thumb's width in from the
+     screen edge, which is exactly where nobody's thumb is */
+  #touch {
+    position: fixed; inset: 0; display: none; pointer-events: none;
+    z-index: 5; user-select: none; -webkit-user-select: none;
+    font-family: "Arial Black", "Arial Bold", Impact, sans-serif; color: #fff;
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
-  #touch div.held { background: rgba(255, 217, 28, 0.35); }
-  #tL { left: 4%; }  #tR { left: 22%; }
-  #tB { right: 4%; bottom: 20% !important; font-size: 0.7em !important; }
-  #tP { right: 22%; } #tW { right: 4%; }
-  #tH { right: 22%; bottom: 20% !important; font-size: 0.7em !important; }
+  #touch div {
+    position: absolute; bottom: 5%; pointer-events: auto;
+    width: 17vmin; height: 17vmin; min-width: 58px; min-height: 58px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.10); border: 2px solid rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    font-size: 5vmin; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; text-shadow: 0 2px 0 #14041c; touch-action: none;
+    transition: background 0.08s, transform 0.08s;
+  }
+  #touch div.held { background: rgba(255, 217, 28, 0.42); transform: scale(0.94); }
+  #tL { left: 3%; }  #tR { left: 23%; }
+  #tB { right: 3%; bottom: 24% !important; font-size: 3.1vmin !important; }
+  #tP { right: 23%; } #tW { right: 3%; }
+  #tH { right: 23%; bottom: 24% !important; font-size: 3.1vmin !important; }
+  /* portrait is a 16:9 game squeezed into a sliver — say so instead of shipping
+     an unplayable letterbox */
+  #rotate {
+    position: fixed; inset: 0; display: none; z-index: 10;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #0b0714; color: #ffd91c; text-align: center;
+    font-family: "Arial Black", "Arial Bold", Impact, sans-serif;
+    font-style: italic; font-weight: 900; padding: 2em;
+  }
+  #rotate .ph {
+    font-size: 15vw; line-height: 1; margin-bottom: 0.25em;
+    animation: tiltph 2.2s ease-in-out infinite;
+  }
+  @keyframes tiltph { 0%, 40% { transform: rotate(0deg); } 70%, 100% { transform: rotate(-90deg); } }
+  #rotate .msg { font-size: 6vw; transform: skewX(-8deg); }
+  #rotate .sm {
+    font-size: 3.4vw; color: #9ff2ff; margin-top: 1.2em; font-style: normal;
+    font-family: "Arial Narrow", Arial, sans-serif; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  body.portrait #rotate { display: flex; }
 </style>
 
 <div id="wrap">
@@ -220,13 +323,16 @@
     <div id="combo" class="thps"><div id="combo-tricks"></div><div id="combo-pts"></div></div>
     <div id="popup" class="thps"></div>
     <div id="goalpop" class="thps"></div>
-    <div id="paused" class="thps">PAUSED</div>
+    <div id="flash"></div>
+    <div id="paused" class="thps">PAUSED<div class="press">P OR ESC TO RESUME</div></div>
+    <div id="mute" class="thps">&#128263; MUTED</div>
     <div id="balance"><div id="bal-needle"></div></div>
     <div id="timer" class="thps">2:00</div>
     <div id="results">
       <h2 class="thps">TIME'S UP!</h2>
       <div id="res-score" class="thps">0</div>
       <div id="res-best" class="thps">BEST RUN 0</div>
+      <div id="res-new" class="thps">NEW PERSONAL BEST!</div>
       <div id="res-stats" class="thps"></div>
       <div id="res-medals"></div>
       <div id="res-goals" class="thps"></div>
@@ -241,6 +347,7 @@
     <div id="title">
       <h1>ENDO!</h1>
       <div class="sub thps">FRONT&nbsp;BRAKE&nbsp;FREESTYLE</div>
+      <div id="t-stats" class="thps"></div>
       <div id="bikesel">
         <div id="bs-row" class="thps">
           <span class="bs-arrow" id="bs-prev">&#9668;</span>
@@ -261,11 +368,16 @@
       </div>
       <div class="press thps">&larr; &rarr; PICK YOUR BIKE · PRESS ANY OTHER KEY TO RIDE</div>
     </div>
-    <div id="touch">
-      <div id="tL">&larr;</div><div id="tR">&rarr;</div>
-      <div id="tB">BRAKE</div><div id="tP">&uarr;</div><div id="tW">&darr;</div><div id="tH">HOP</div>
-    </div>
   </div>
+</div>
+<div id="touch">
+  <div id="tL">&larr;</div><div id="tR">&rarr;</div>
+  <div id="tB">BRAKE</div><div id="tP">&uarr;</div><div id="tW">&darr;</div><div id="tH">HOP</div>
+</div>
+<div id="rotate">
+  <div class="ph">&#128241;</div>
+  <div class="msg">TURN YOUR PHONE</div>
+  <div class="sm">ENDO! rides in landscape</div>
 </div>
 
 <script>
@@ -2012,6 +2124,7 @@ let score = 0, bestCombo = 0, bestRun = 0;
 try {
   bestCombo = parseInt(localStorage.getItem('endo_best') || '0', 10) || 0;
   bestRun = parseInt(localStorage.getItem('endo_bestrun') || '0', 10) || 0;
+  muted = localStorage.getItem('endo_mute') === '1';
 } catch (e) {}
 const combo = { chain: [], pts: 0, bankT: 0 };
 let curWheelie = null, curEndo = null, fakieT = 0, fakieDone = false;
@@ -2176,6 +2289,22 @@ function bankSfx(n) {
     setTimeout(() => sfx(notes[i], 0.12, 'square', 0.14), i * 70);
   }
 }
+// last five seconds: a tick a second, then a sting on the horn — the blinking
+// clock alone is easy to miss when you're watching the ground
+function tickSfx(n) { sfx(n <= 1 ? 1100 : 880, 0.07, 'square', 0.12); }
+function timeUpSfx() {
+  if (!AC) return;
+  [660, 554, 440].forEach((f, i) => setTimeout(() => sfx(f, 0.3, 'sawtooth', 0.16), i * 150));
+}
+// results fanfare, scaled to the medal you actually earned
+function resultsSfx(sc, pb) {
+  if (!AC) return;
+  const idx = MEDALS.findIndex(m => sc >= m[1]);          // 0 gold … 2 bronze, -1 none
+  const runs = [[523, 659, 784, 1046, 1318, 1568], [523, 659, 784, 1046], [523, 659, 784], [392, 330]];
+  const seq = runs[idx < 0 ? 3 : idx];
+  seq.forEach((f, i) => setTimeout(() => sfx(f, 0.26, 'square', 0.15), 420 + i * 110));
+  if (pb) [1318, 1568, 2093].forEach((f, i) => setTimeout(() => sfx(f, 0.2, 'triangle', 0.13), 1250 + i * 90));
+}
 function crashSfx() {
   if (!AC) return;
   const t = AC.currentTime;
@@ -2195,11 +2324,21 @@ function crashSfx() {
 //  TRICKS & SCORE
 // ================================================================
 const el = {};
-['score','hi','speed','combo-tricks','combo-pts','popup','balance','bal-needle','hint','title','touch',
- 'timer','stance','results','res-score','res-best','res-medals','res-stats','res-goals',
- 'goals','goalpop','paused','bs-name','bs-blurb','bs-stats','bs-prev','bs-next','res-bike'
+['score','hi','speed','combo-tricks','combo-pts','popup','balance','bal-needle','hint','title','touch','flash',
+ 'timer','stance','results','res-score','res-best','res-new','res-medals','res-stats','res-goals',
+ 'goals','goalpop','paused','mute','t-stats','bs-name','bs-blurb','bs-stats','bs-prev','bs-next','res-bike'
 ].forEach(id => el[id] = document.getElementById(id));
 el.goals.textContent = 'GOALS ' + goalCount() + '/' + GOALS.length;
+// the title screen reports your career back to you — best run, goals, medal
+function titleStats() {
+  const med = MEDALS.find(m => bestRun >= m[1]);
+  el['t-stats'].innerHTML = bestRun
+    ? 'BEST RUN <b>' + bestRun.toLocaleString() + '</b>' + (med ? ' · <b>' + med[0] + '</b>' : '') +
+      ' · GOALS <b>' + goalCount() + '/' + GOALS.length + '</b>'
+    : 'TWO MINUTES · ONE BRAKE';
+}
+titleStats();
+el.mute.className = 'thps' + (muted ? ' on' : '');   // mute survives a reload
 
 // ---- the garage: swap bikes on the title screen and between runs ----
 // The stat bars are derived from the same multipliers the physics reads, so a
@@ -2400,10 +2539,15 @@ function airTricks(t, deg) {
 function finishRun() {
   if (combo.chain.length) bank();
   runOver = true;
-  if (score > bestRun) {
-    bestRun = score;
+  const pb = score > bestRun && score > 0;
+  if (pb) {
+    bestRun = Math.round(score);
     try { localStorage.setItem('endo_bestrun', String(bestRun)); } catch (e) {}
   }
+  el['res-new'].className = 'thps' + (pb ? ' on' : '');
+  hudEl.classList.add('over');
+  titleStats();
+  resultsSfx(score, pb);
   el['res-score'].textContent = Math.round(score).toLocaleString() + ' PTS';
   el['res-best'].textContent = 'BEST RUN ' + bestRun.toLocaleString();
   el['res-medals'].innerHTML = MEDALS.map(m =>
@@ -2423,7 +2567,7 @@ function finishRun() {
 function newRun() {
   score = 0; runT = RUN_LEN; runOver = false; graceT = 0;
   runStats.bestCombo = 0; runStats.cones = 0; runStats.bushes = 0; runStats.air = 0;
-  paused = false;
+  paused = false; autoPause = false;
   el.paused.style.display = 'none';
   if (AC && AC.state === 'suspended') AC.resume();
   combo.chain.length = 0; combo.pts = 0; combo.bankT = 0;
@@ -2435,6 +2579,7 @@ function newRun() {
   bk.sus = 0; bk.susVel = 0; bk.vPitch = 0; bk.sway = 0; bk.wob = 0; bk.crouch = 0;
   bk.fakie = false; bk.twist = 0;
   el.results.style.display = 'none';
+  hudEl.classList.remove('over');
 }
 function trickStep(dt) {
   if (!started) return;
@@ -2492,6 +2637,9 @@ function crash(type) {
   shake = 1;
   spawnDust(bk.x, bk.y + 0.3, bk.z, 16, DUST, 2.4, 0.7);
   crashSfx();
+  el.flash.className = '';
+  void el.flash.offsetWidth;
+  el.flash.className = 'on';
   bail();
 }
 function respawn() {
@@ -3072,8 +3220,32 @@ function start() {
   if (started) return;
   started = true;
   initAudio();
-  el.title.style.display = 'none';
+  el.title.classList.add('gone');                                  // dissolve the title…
+  setTimeout(() => { el.title.style.display = 'none'; }, 320);
+  hudEl.classList.add('run');                                      // …as the HUD fades up
+  if (touchDev) el.touch.style.display = 'block';                  // pads would cover the title text
 }
+function setMuted(m) {
+  muted = m;
+  if (master) master.gain.value = muted ? 0 : 0.5;
+  el.mute.className = 'thps' + (muted ? ' on' : '');
+  try { localStorage.setItem('endo_mute', muted ? '1' : '0'); } catch (e) {}
+}
+// one place to flip the pause, so the key, the tab-switch and newRun agree
+function setPaused(p) {
+  if (!started || runOver || p === paused) return;
+  paused = p;
+  el.paused.style.display = paused ? 'flex' : 'none';
+  if (AC) { if (paused) AC.suspend(); else AC.resume(); }
+}
+// tabbing away used to burn the clock down with nobody riding. A pause the game
+// put on by itself lifts by itself when you come back; a deliberate P stays put.
+let autoPause = false;
+function softPause() { if (started && !runOver && !paused) { autoPause = true; setPaused(true); } }
+function softResume() { if (autoPause) { autoPause = false; setPaused(false); } }
+addEventListener('blur', softPause);
+addEventListener('focus', () => { if (!document.body.classList.contains('portrait')) softResume(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) softPause(); });
 const BIKE_KEY = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
 addEventListener('keydown', e => {
   if (e.code in KEYMAP || e.code === 'Space') e.preventDefault();
@@ -3096,14 +3268,8 @@ addEventListener('keydown', e => {
       bk.fakie = false; bk.twist = 0;
     }
   }
-  if (e.code === 'KeyM') { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.5; }
-  if (e.code === 'KeyP' || e.code === 'Escape') {
-    if (started && !runOver) {
-      paused = !paused;
-      el.paused.style.display = paused ? 'flex' : 'none';
-      if (AC) { if (paused) AC.suspend(); else AC.resume(); }
-    }
-  }
+  if (e.code === 'KeyM') setMuted(!muted);
+  if (e.code === 'KeyP' || e.code === 'Escape') { autoPause = false; setPaused(!paused); }
 });
 addEventListener('keyup', e => { if (e.code in KEYMAP) input[KEYMAP[e.code]] = false; });
 addEventListener('pointerdown', start);
@@ -3113,16 +3279,45 @@ for (const a of [['bs-prev', -1], ['bs-next', 1]]) {
 }
 
 // touch controls
-if ('ontouchstart' in window) {
-  el.touch.style.display = 'block';
+const touchDev = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+// a touchscreen laptop is still a keyboard machine — only a coarse PRIMARY pointer
+// means there's no keyboard on the other end of this
+const phoneLike = touchDev && matchMedia('(pointer: coarse)').matches;
+if (touchDev) {
+  if (phoneLike) {
+    // the in-run key reminder is just clutter under the pads, and "press any key"
+    // is a dead end with no keys to press
+    el.hint.style.display = 'none';
+    document.querySelector('#title .press').textContent = '◄ ► PICK YOUR BIKE · TAP TO RIDE';
+    document.querySelector('#results .press').textContent = 'TAP TO RIDE AGAIN';
+    el.paused.querySelector('.press').textContent = 'TAP TO RESUME';
+  }
   const map = { tL: 'left', tR: 'right', tB: 'brake', tP: 'pedal', tW: 'lean', tH: 'hop' };
   for (const id in map) {
     const d = document.getElementById(id);
     const on = e => { e.preventDefault(); start(); input[map[id]] = true; d.classList.add('held'); };
     const off = e => { e.preventDefault(); input[map[id]] = false; d.classList.remove('held'); };
     d.addEventListener('touchstart', on); d.addEventListener('touchend', off); d.addEventListener('touchcancel', off);
+    // a finger that slides off the pad must still release it
+    d.addEventListener('pointerdown', e => e.stopPropagation());
   }
+  // no keyboard here: a tap off the pads is how you ride again or shake off a pause
+  addEventListener('touchstart', e => {
+    if (e.target.closest('#touch') || e.target.closest('#res-bike') || e.target.closest('.bs-arrow')) return;
+    if (runOver) { e.preventDefault(); newRun(); }
+    else if (paused && !document.body.classList.contains('portrait')) { e.preventDefault(); setPaused(false); }
+  }, { passive: false });
 }
+// portrait on a phone is a 16:9 game squished into a sliver — park the run and
+// say so, then pick it straight back up when they turn the phone
+function orient() {
+  const portrait = phoneLike && innerHeight > innerWidth * 1.08;
+  document.body.classList.toggle('portrait', portrait);
+  if (portrait) softPause(); else softResume();
+}
+addEventListener('resize', orient);
+addEventListener('orientationchange', orient);
+orient();
 
 // ================================================================
 //  CAMERA & RENDER
@@ -3385,13 +3580,20 @@ function render(dt) {
 // ================================================================
 //  HUD
 // ================================================================
-const hud = { score: -1, hi: -1, speed: -1, tricks: '', pts: '', timer: '', low: false, fakie: null };
+const hud = { score: -1, hi: -1, speed: -1, tricks: '', pts: '', timer: '', low: false, fakie: null, tt: null };
 function hudStep(dt) {
   if (hintT > 0 && started) { hintT -= dt; if (hintT <= 0) el.hint.style.opacity = '0'; }
   if (browseT > 0) { browseT -= dt; if (browseT <= 0) el.title.classList.remove('browsing'); }
   const tt = Math.max(0, Math.ceil(runT));
   const tstr = Math.floor(tt / 60) + ':' + String(tt % 60).padStart(2, '0');
   if (tstr !== hud.timer) { hud.timer = tstr; el.timer.textContent = tstr; }
+  // audible countdown over the last five seconds
+  if (tt !== hud.tt) {
+    if (started && !runOver && hud.tt !== null && tt < hud.tt && tt <= 5) {
+      if (tt === 0) timeUpSfx(); else tickSfx(tt);
+    }
+    hud.tt = tt;
+  }
   const low = started && !runOver && runT < 10.5;
   if (low !== hud.low) { hud.low = low; el.timer.className = 'thps' + (low ? ' low' : ''); }
   const s = Math.round(score);
