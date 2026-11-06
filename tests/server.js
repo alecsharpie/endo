@@ -4,4 +4,4 @@ const fs = require('fs');
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html' });
   res.end(fs.readFileSync('/Users/alec/me/endo/index.html'));
-}).listen(8931, () => console.log('up'));
+}).listen(8931, '127.0.0.1', () => console.log('up'));
